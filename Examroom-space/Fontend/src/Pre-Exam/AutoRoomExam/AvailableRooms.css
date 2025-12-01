@@ -1,0 +1,156 @@
+/* AvailableRooms.css - Modern UI redesign */
+
+.available-rooms-page .custom-background {
+    background-color: #f5f7fa;
+    
+  }
+  
+  /* Stats Cards */
+  .available-rooms-page .stats-row {
+    margin-left: -0.5rem;
+    margin-right: -0.5rem;
+  }
+  
+  .available-rooms-page .stats-row > div {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+  
+  .available-rooms-page .stats-card {
+    border: none;
+    border-radius: 10px;
+    transition: transform 0.2s, box-shadow 0.3s;
+    overflow: hidden;
+  }
+  
+  .available-rooms-page .stats-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08) !important;
+  }
+  
+  .available-rooms-page .stats-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 50px;
+    height: 50px;
+    border-radius: 10px;
+    flex-shrink: 0;
+  }
+  
+  /* Main Card */
+  .available-rooms-page .available-rooms-card {
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  
+  .available-rooms-page .available-rooms-card .card-header {
+    background: #ffffff;
+    border-color: #e9ecef;
+  }
+  
+  /* Search and Filter */
+  .available-rooms-page .search-container,
+  .available-rooms-page .filter-container {
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  
+  .available-rooms-page .search-input:focus,
+  .available-rooms-page .form-select:focus {
+    box-shadow: none;
+    border-color: #ced4da;
+  }
+  
+  .available-rooms-page .filter-badge {
+    font-weight: normal;
+  }
+  
+  /* Table */
+  .available-rooms-page .custom-table-container {
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    background-color: white;
+  }
+  
+  .available-rooms-page .room-table {
+    margin-bottom: 0;
+  }
+  
+  .available-rooms-page .room-table th {
+    background-color: #f8f9fa;
+    border-bottom: 2px solid #e9ecef;
+    padding: 0.75rem 1rem;
+    font-weight: 600;
+    color: #495057;
+  }
+  
+  .available-rooms-page .room-table td {
+    padding: 0.75rem 1rem;
+    vertical-align: middle;
+  }
+  
+  .available-rooms-page .sortable-header {
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.2s, background-color 0.2s;
+    position: relative;
+  }
+  
+  .available-rooms-page .sortable-header:hover {
+    background-color: #f1f4f8;
+    color: #0d6efd;
+  }
+  
+  .available-rooms-page .room-row {
+    transition: background-color 0.2s;
+  }
+  
+  .available-rooms-page .room-row:hover {
+    background-color: #f8f9ff;
+  }
+  
+  .available-rooms-page .status-badge {
+    font-weight: normal;
+    letter-spacing: 0.3px;
+  }
+  
+  .available-rooms-page .room-icon-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background-color: #e7f1ff;
+    border-radius: 6px;
+    color: #0d6efd;
+  }
+  
+  /* Buttons */
+  .available-rooms-page .action-btn {
+    transition: all 0.2s;
+  }
+  
+  .available-rooms-page .btn-action {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s, background-color 0.2s;
+  }
+  
+  .available-rooms-page .btn-action:hover {
+    transform: translateY(-2px);
+  }
+  
+  /* Animation */
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  
+  .available-rooms-page .btn:hover .refresh-icon {
+    animation: spin 0.7s ease-in-out;
+  }

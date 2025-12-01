@@ -1,0 +1,72 @@
+.exam-table-container {
+  overflow-x: auto;
+  margin: 0 auto;
+  max-width: 100%;
+}
+
+.exam-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  table-layout: auto; /* Default value, ensures columns adjust based on content */
+}
+
+.exam-table th, .exam-table td {
+  padding: 4px;
+  text-align: left;
+  border: 1px solid #dee2e6;
+}
+
+.exam-table thead th {
+  background-color: #f8f9fa;
+  font-weight: bold;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.exam-table tbody tr:nth-child(even) {
+  background-color: #f8f9fa;
+}
+
+.exam-table tbody tr:hover {
+  background-color: #e9ecef;
+}
+
+@media screen and (max-width: 768px) {
+  .exam-table {
+      font-size: 12px;
+  }
+
+  .exam-table th, .exam-table td {
+      padding: 8px;
+  }
+}
+
+@media print {
+  .exam-table-container {
+      overflow-x: visible;
+  }
+
+  .exam-table {
+      font-size: 10pt;
+      width: 100%;
+      page-break-inside: auto;
+  }
+
+  .exam-table th, .exam-table td {
+      padding: 5pt;
+  }
+
+  .exam-table thead th {
+      background-color: #f8f9fa !important;
+      color: #000 !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+  }
+
+  .exam-table tbody tr:nth-child(even) {
+      background-color: #f8f9fa !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+  }
+}

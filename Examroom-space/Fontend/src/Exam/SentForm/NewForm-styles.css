@@ -1,0 +1,61 @@
+.exam-form {
+  background: linear-gradient(to right, #c1e1e1, #88d8b0);
+  min-height: 100vh;
+  width: 100%;
+  margin: 0;
+  padding-top: 100px; /* ปรับลดลงเพื่อให้เนื้อหาไม่ถูกซ่อนใต้ navbar */
+  display: flex;
+  flex-direction: column;
+}
+
+.form-container {
+  background-color: #ffffff;
+  padding: 24px;
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  width: 100%; /* เพิ่มบรรทัดนี้ */
+  max-width: 1200px; /* เพิ่มบรรทัดนี้ เพื่อจำกัดความกว้างสูงสุด */
+  margin: 0 auto; /* เพิ่มบรรทัดนี้ เพื่อจัดให้อยู่กึ่งกลาง */
+
+}
+
+.form-container h2 {
+  font-size: 24px;
+  color: #333333;
+}
+
+.form-container .form-control {
+  border-radius: 4px;
+  border: 1px solid #ced4da;
+}
+
+.form-container .form-select {
+  border-radius: 4px;
+  border: 1px solid #ced4da;
+}
+
+.form-container button {
+  padding: 8px 16px;
+  background-color: #007bff;
+  color: white;
+  border-radius: 4px;
+  transition: background-color 0.3s ease;
+}
+
+.form-container button:hover {
+  background-color: #0056b3;
+}
+
+.button-group {
+  display: flex;
+  gap: 1rem; /* ระยะห่างระหว่างปุ่ม */
+  justify-content: flex-start; /* จัดตำแหน่งปุ่มให้ชิดซ้าย */
+  margin-top: 1rem; /* เพิ่มระยะห่างด้านบนหากต้องการ */
+}
+.flex-row {
+  display: flex;
+  flex-direction: row;
+  gap: 10px; /* คุณสามารถปรับช่องว่างระหว่างสองคอมโพเนนต์ได้ตามต้องการ */
+  text-align: left;
+}
+

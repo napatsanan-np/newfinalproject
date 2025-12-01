@@ -1,0 +1,12 @@
+@media print {
+  body {
+    width: 210mm;
+    margin: 0;
+    padding: 0;
+  }
+  .print-section {
+    width: 100%;
+    max-width: 190mm;
+    margin: 0 auto;
+  }
+}

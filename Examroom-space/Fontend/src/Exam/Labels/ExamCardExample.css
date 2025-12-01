@@ -1,0 +1,18 @@
+@media print {
+    body {
+      margin: 0; /* Remove default margin */
+    }
+  
+    .d-flex {
+      flex-wrap: wrap; /* Keep wrapping for flex items */
+      justify-content: space-between; /* Distribute space evenly */
+    }
+  
+    .card {
+      width: 100%; /* Ensure cards take full width */
+      margin-bottom: 0; /* Remove bottom margin */
+    }
+  
+    /* Optional: Additional styles for the print layout */
+  }
+  

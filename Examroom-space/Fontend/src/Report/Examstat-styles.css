@@ -1,0 +1,128 @@
+
+.examstat-container .fade-in {
+  animation: examstat-fadeIn 0.5s ease-in;
+}
+
+@keyframes examstat-fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.examstat-container .custom-table th {
+  background-color: #f8f9fa;
+}
+
+.examstat-container .badge-pill {
+  border-radius: 50rem;
+  padding: 0.35em 0.8em;
+}
+
+/* ปรับแต่ง stats card ให้มีพื้นหลังทึบมากขึ้น */
+.examstat-container .stats-card {
+  background-color: #ffffff;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  height: 100%;
+  text-align: center;
+  transition: all 0.3s ease;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 0.25rem 0.5rem rgba(0,0,0,0.1);
+}
+
+.examstat-container .stats-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 .5rem 1rem rgba(0,0,0,.15);
+}
+
+/* ปรับแต่งสีพื้นหลังของ success card และ warning card ให้ทึบขึ้น */
+.examstat-container .stats-card.success-card {
+  background-color: #e6f7ef;
+  border-color: #2ecc71;
+}
+
+.examstat-container .stats-card.warning-card {
+  background-color: #fdeaea;
+  border-color: #e74c3c;
+}
+
+/* Custom tooltip สำหรับ recharts */
+.examstat-tooltip {
+  background-color: white;
+  padding: 12px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.examstat-tooltip .tooltip-label {
+  margin: 0 0 8px 0;
+  font-weight: bold;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 5px;
+}
+
+.examstat-tooltip .tooltip-item {
+  margin: 3px 0;
+  display: flex;
+  justify-content: space-between;
+}
+
+/* ปรับแต่ง Select component เฉพาะในหน้า Examstat */
+.examstat-container .examstat-select .react-select__control {
+  border-radius: 8px;
+}
+
+.examstat-container .examstat-select .react-select__control:hover {
+  border-color: #80bdff;
+}
+
+.examstat-container .examstat-select .react-select__option--is-selected {
+  background-color: #0d6efd;
+}
+
+.examstat-container .examstat-select .react-select__option:hover {
+  background-color: #f8f9fa;
+}
+
+/* การ์ดรายงานเฉพาะของภาควิชา - เพิ่มสีพื้นหลังให้ทึบมากขึ้น */
+.examstat-container .department-card {
+  margin-top: 1.5rem;
+  background-color: #ffffff;
+  box-shadow: 0 0.25rem 0.75rem rgba(0,0,0,0.1);
+}
+
+.examstat-container .department-card .card-header {
+  background-color: #0d6efd;
+  color: white;
+  padding: 1rem;
+}
+
+.examstat-container .department-card .card-body {
+  padding: 1.25rem;
+  background-color: #ffffff;
+}
+
+/* สถิติสรุป */
+.examstat-container .summary-stats {
+  margin-bottom: 1.5rem;
+}
+
+/* รูปแบบสำหรับส่วนกราฟ */
+.examstat-container .chart-container {
+  height: 500px;
+  margin-bottom: 1.5rem;
+  background-color: #ffffff;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
+}
+
+/* รูปแบบสำหรับส่วนเลือกภาควิชา */
+.examstat-container .department-selector {
+  background-color: #ffffff;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  margin-top: 1rem;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
+}

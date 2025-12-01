@@ -1,0 +1,43 @@
+/* UploadFile.css */
+
+/* Custom styles for the file upload area */
+.form-file-custom {
+    text-align: center;
+    padding: 2rem;
+    border: 2px dashed #ccc;
+    border-radius: 10px;
+    transition: border-color 0.3s ease-in-out;
+}
+
+.form-file-custom:hover {
+    border-color: #999;
+}
+
+/* Custom styles for the text when no data is available */
+.text-center {
+    text-align: center;
+}
+
+.text-gray-600 {
+    color: #6c757d;
+}
+
+/* Custom button hover effect */
+
+
+/* Centering and styling for the dropdown */
+.custom-select {
+    width: 100%;
+    max-width: 300px;
+    margin: 0 auto;
+    font-size: 1rem;
+    border-radius: 5px;
+    border: 1px solid #ced4da;
+}
+.importfile-bg {
+    padding-top: 64px;
+    background: linear-gradient(to right, #000000, #000000);
+    min-height: 100vh;
+    font-family: 'Kanit', sans-serif;
+  }
+

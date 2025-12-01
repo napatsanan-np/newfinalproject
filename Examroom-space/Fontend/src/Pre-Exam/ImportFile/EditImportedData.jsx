@@ -1,0 +1,508 @@
+// EditImportedData.jsx
+import React, { useEffect, useMemo, useState } from "react";
+import axios from "axios";
+import Swal from "sweetalert2";
+import {
+  Tabs,
+  Tab,
+  Table,
+  Button,
+  Form,
+  Spinner,
+  Row,
+  Col,
+  Modal,
+} from "react-bootstrap";
+
+const URL = localStorage.getItem("API");
+const token = localStorage.getItem("token");
+const authHeaders = { Authorization: `Bearer ${token}` };
+
+const alertError = (err, fallback = "เกิดข้อผิดพลาด") => {
+  const msg =
+    err?.response?.data?.error ||
+    err?.response?.data?.message ||
+    err?.message ||
+    fallback;
+  Swal.fire("ผิดพลาด", msg, "error");
+  console.error(err?.response || err);
+};
+
+// แปลงคีย์ตัวเลขให้เป็น number
+const toIntIfNeeded = (obj, numberKeys = []) => {
+  const out = { ...obj };
+  numberKeys.forEach((k) => {
+    if (k in out && out[k] !== "" && out[k] !== null && out[k] !== undefined) {
+      const n = Number(out[k]);
+      out[k] = Number.isNaN(n) ? out[k] : n;
+    }
+  });
+  return out;
+};
+
+/* =========================================================
+ * 1) ตารางสอบ (examtable)
+ * ========================================================= */
+const Examtable = () => {
+  const [rows, setRows] = useState([]);
+  const [q, setQ] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({
+    Ref: "",
+    Edate: "",
+    Etime: "",
+    Hr: "",
+    Course: "",
+    Lecturer: "",
+  });
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const res = await axios.get(`${URL}/select_data/examtable`, {
+        headers: authHeaders,
+      });
+      setRows(Array.isArray(res.data) ? res.data : []);
+    } catch (e) {
+      alertError(e, "โหลดข้อมูลตารางสอบไม่สำเร็จ");
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const filtered = useMemo(() => {
+    const key = q.trim().toLowerCase();
+    if (!key) return rows;
+    return rows.filter((r) =>
+      String(r.Course ?? "").toLowerCase().includes(key)
+    );
+  }, [rows, q]);
+
+  const openModal = (row) => {
+    setForm({
+      Ref: row.Ref ?? "",
+      Edate: row.Edate ?? "",
+      Etime: row.Etime ?? "",
+      Hr: row.Hr ?? "",
+      Course: row.Course ?? "",
+      Lecturer: row.Lecturer ?? "",
+    });
+    setOpen(true);
+  };
+
+  const save = async () => {
+    try {
+      const payload = toIntIfNeeded(form, ["Ref", "Hr"]);
+      await axios.post(`${URL}/admin/update/examtable`, payload, {
+        headers: authHeaders,
+      });
+      Swal.fire("สำเร็จ", "บันทึกข้อมูลแล้ว", "success");
+      setOpen(false);
+      fetchData();
+    } catch (e) {
+      alertError(e, "อัปเดตไม่สำเร็จ");
+    }
+  };
+
+  return (
+    <>
+      <Row className="mb-3">
+        <Col xs={12} md={6}>
+          <Form.Control
+            placeholder="ค้นหาโดยชื่อวิชา (Course)"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+        </Col>
+      </Row>
+
+      {loading ? (
+        <div className="text-center py-3">
+          <Spinner animation="border" />
+        </div>
+      ) : (
+        <Table striped bordered hover responsive>
+          <thead>
+            <tr>
+              <th style={{ width: 100 }}>Ref</th>
+              <th>Course</th>
+              <th style={{ width: 120 }}>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((r) => (
+              <tr key={r.Ref}>
+                <td>{r.Ref}</td>
+                <td>{r.Course}</td>
+                <td>
+                  <Button size="sm" onClick={() => openModal(r)}>
+                    แก้ไข
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      )}
+
+      <Modal show={open} onHide={() => setOpen(false)} centered size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title>แก้ไข – {form.Course}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {Object.keys(form).map((k) => (
+            <Form.Group className="mb-3" key={k}>
+              <Form.Label>{k}</Form.Label>
+              <Form.Control
+                value={form[k]}
+                onChange={(e) => setForm({ ...form, [k]: e.target.value })}
+              />
+            </Form.Group>
+          ))}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setOpen(false)}>
+            ยกเลิก
+          </Button>
+          <Button variant="success" onClick={save}>
+            บันทึก
+          </Button>
+        </Modal.Footer>
+      </Modal>
+    </>
+  );
+};
+
+/* =========================================================
+ * 2) ห้องสอบ (roomexam)
+ * ========================================================= */
+const Roomexam = () => {
+  const [rows, setRows] = useState([]);
+  const [q, setQ] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({
+    No: "",
+    Ref: "",
+    Edate: "",
+    Etime: "",
+    Hr: "",
+    Course: "",
+    Lecturer: "",
+    Room_id: "",
+    Seatrow: "",
+    Type_exam: "",
+    Group_exam: "",
+  });
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const res = await axios.get(`${URL}/select_data/roomexam`, {
+        headers: authHeaders,
+      });
+      setRows(Array.isArray(res.data) ? res.data : []);
+    } catch (e) {
+      alertError(e, "โหลดข้อมูลห้องสอบไม่สำเร็จ");
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const filtered = useMemo(() => {
+    const key = q.trim().toLowerCase();
+    if (!key) return rows;
+    return rows.filter((r) =>
+      String(r.Course ?? "").toLowerCase().includes(key)
+    );
+  }, [rows, q]);
+
+  const openModal = (row) => {
+    setForm({
+      No: row.No ?? "",
+      Ref: row.Ref ?? "",
+      Edate: row.Edate ?? "",
+      Etime: row.Etime ?? "",
+      Hr: row.Hr ?? "",
+      Course: row.Course ?? "",
+      Lecturer: row.Lecturer ?? "",
+      Room_id: row.Room_id ?? "",
+      Seatrow: row.Seatrow ?? "",
+      Type_exam: row.Type_exam ?? "",
+      Group_exam: row.Group_exam ?? "",
+    });
+    setOpen(true);
+  };
+
+  const save = async () => {
+    try {
+      const payload = toIntIfNeeded(form, ["No", "Ref", "Hr", "Room_id"]);
+      await axios.post(`${URL}/admin/update/roomexam`, payload, {
+        headers: authHeaders,
+      });
+      Swal.fire("สำเร็จ", "บันทึกข้อมูลแล้ว", "success");
+      setOpen(false);
+      fetchData();
+    } catch (e) {
+      alertError(e);
+    }
+  };
+
+  return (
+    <>
+      <Row className="mb-3">
+        <Col xs={12} md={6}>
+          <Form.Control
+            placeholder="ค้นหาโดยชื่อวิชา (Course)"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+        </Col>
+      </Row>
+
+      {loading ? (
+        <div className="text-center py-3">
+          <Spinner animation="border" />
+        </div>
+      ) : (
+        <Table striped bordered hover responsive>
+          <thead>
+            <tr>
+              <th style={{ width: 90 }}>No</th>
+              <th style={{ width: 100 }}>Ref</th>
+              <th>Course</th>
+              <th style={{ width: 120 }}>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((r, idx) => (
+              <tr key={`${r.No}-${r.Ref}-${idx}`}>
+                <td>{r.No}</td>
+                <td>{r.Ref}</td>
+                <td>{r.Course}</td>
+                <td>
+                  <Button size="sm" onClick={() => openModal(r)}>
+                    แก้ไข
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      )}
+
+      <Modal show={open} onHide={() => setOpen(false)} centered size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title>แก้ไข – {form.Course}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {Object.keys(form).map((k) => (
+            <Form.Group className="mb-3" key={k}>
+              <Form.Label>{k}</Form.Label>
+              <Form.Control
+                value={form[k]}
+                onChange={(e) => setForm({ ...form, [k]: e.target.value })}
+              />
+            </Form.Group>
+          ))}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setOpen(false)}>
+            ยกเลิก
+          </Button>
+          <Button variant="success" onClick={save}>
+            บันทึก
+          </Button>
+        </Modal.Footer>
+      </Modal>
+    </>
+  );
+};
+
+/* =========================================================
+ * 3) รายละเอียดข้อสอบ (detail_exam)
+ *   map key จาก backend (ตัวเล็ก) → form (ตัวใหญ่)
+ * ========================================================= */
+const DetailExam = () => {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({
+    Ref: "",
+    Submit: "",
+    Sub_date: "",
+    Copy: "",
+    Page: "",
+    Recive: "",
+    Rec_date: "",
+    Qty: "",
+    Staple_conner: "",
+    Staple_apart: "",
+    Calculator: "",
+    Answesheet: "",
+    Answerbook_use: "",
+    Remark: "",
+    Color: "",
+    Lecturer: "",
+    No_st: "",
+    Fileexam: "",
+    Exam_type: "",
+  });
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const res = await axios.get(`${URL}/select_data/detail_exam_all`, {
+        headers: authHeaders,
+      });
+      setRows(Array.isArray(res.data) ? res.data : []);
+    } catch (e) {
+      alertError(e, "โหลดรายละเอียดข้อสอบไม่สำเร็จ");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const openModal = (r) => {
+    setForm({
+      Ref: r.Ref ?? r.ref ?? "",
+      Submit: r.Submit ?? r.submit ?? "",
+      Sub_date: r.Sub_date ?? r.sub_date ?? "",
+      Copy: r.Copy ?? r.copy ?? "",
+      Page: r.Page ?? r.page ?? "",
+      Recive: r.Recive ?? r.recive ?? "",
+      Rec_date: r.Rec_date ?? r.rec_date ?? "",
+      Qty: r.Qty ?? r.qty ?? "",
+      Staple_conner: r.Staple_conner ?? r.staple_conner ?? "",
+      Staple_apart: r.Staple_apart ?? r.staple_apart ?? "",
+      Calculator: r.Calculator ?? r.calculator ?? "",
+      Answesheet: r.Answesheet ?? r.answesheet ?? "",
+      Answerbook_use: r.Answerbook_use ?? r.answerbook_use ?? "",
+      Remark: r.Remark ?? r.remark ?? "",
+      Color: r.Color ?? r.color ?? "",
+      Lecturer: r.Lecturer ?? r.lecturer ?? "",
+      No_st: r.No_st ?? r.no_st ?? "",
+      Fileexam:
+        r.Fileexam ??
+        (Array.isArray(r.Files) ? r.Files.join(", ") : r.Files ?? ""),
+      Exam_type: r.Exam_type ?? r.exam_type ?? "",
+    });
+    setOpen(true);
+  };
+
+  const save = async () => {
+    try {
+      // ตอนนี้ payload ใช้ชื่อแบบ form (ตัวใหญ่)
+      const payload = toIntIfNeeded(form, ["Ref", "Copy", "Page", "Qty", "No_st"]);
+
+      await axios.post(`${URL}/admin/update/detail_exam`, payload, {
+        headers: authHeaders,
+      });
+      Swal.fire("สำเร็จ", "บันทึกข้อมูลแล้ว", "success");
+      setOpen(false);
+      fetchData();
+    } catch (e) {
+      alertError(e);
+    }
+  };
+
+  return (
+    <>
+      {loading ? (
+        <div className="text-center py-3">
+          <Spinner animation="border" />
+        </div>
+      ) : (
+        <Table striped bordered hover responsive>
+          <thead>
+            <tr>
+              <th style={{ width: 80 }}>Ref</th>
+              <th>Submit</th>
+              <th>Exam_type</th>
+              <th style={{ width: 120 }}>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, idx) => (
+              <tr key={`${r.Ref ?? r.ref}-${idx}`}>
+                <td>{r.Ref ?? r.ref}</td>
+                <td>{r.Submit ?? r.submit}</td>
+                <td>{r.Exam_type ?? r.exam_type}</td>
+                <td>
+                  <Button size="sm" onClick={() => openModal(r)}>
+                    แก้ไข
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      )}
+
+      <Modal show={open} onHide={() => setOpen(false)} centered size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title>แก้ไขรายละเอียดข้อสอบ</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {Object.keys(form).map((k) => (
+            <Form.Group className="mb-3" key={k}>
+              <Form.Label>{k}</Form.Label>
+              <Form.Control
+                value={form[k]}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    [k]: e.target.value,
+                  })
+                }
+              />
+            </Form.Group>
+          ))}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setOpen(false)}>
+            ยกเลิก
+          </Button>
+          <Button variant="success" onClick={save}>
+            บันทึก
+          </Button>
+        </Modal.Footer>
+      </Modal>
+    </>
+  );
+};
+
+const EditImportedData = () => {
+  return (
+    <div>
+      <h4 className="mb-3">แก้ไขข้อมูล</h4>
+      <Tabs defaultActiveKey="examtable" className="mb-3">
+        <Tab eventKey="examtable" title="ตารางสอบ">
+          <Examtable />
+        </Tab>
+        <Tab eventKey="roomexam" title="ห้องสอบ">
+          <Roomexam />
+        </Tab>
+        <Tab eventKey="detail" title="รายละเอียดข้อสอบ">
+          <DetailExam />
+        </Tab>
+      </Tabs>
+    </div>
+  );
+};
+
+export default EditImportedData;

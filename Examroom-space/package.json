@@ -1,0 +1,33 @@
+{
+  "dependencies": {
+    "loadash": "^1.0.0",
+    "lucide-react": "^0.474.0",
+    "swr": "^2.2.5",
+    "xlsx": "^0.18.5"
+  },
+  "name": "examroom-space",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Wanke66/Examroom-space.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Wanke66/Examroom-space/issues"
+  },
+  "homepage": "https://github.com/Wanke66/Examroom-space#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.55.1"
+  }
+}

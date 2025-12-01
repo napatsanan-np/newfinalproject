@@ -1,0 +1,58 @@
+/* EditImportedData-styles.css */
+
+/* ใช้ namespace .edit-imported ครอบหน้าทั้งหน้า ป้องกันชนกับหน้าอื่น */
+.edit-imported .custom-background {
+  background-color: #f5f7fa;
+  min-height: 100vh;
+  padding: 2rem 0;
+}
+
+/* Card */
+.edit-imported .edit-card {
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  width: 95%;
+  max-width: 1500px;
+  margin: auto;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+/* Nav pills */
+.edit-imported .nav-pills .nav-link {
+  border-radius: 8px;
+  font-weight: 600;
+  padding: 10px 20px;
+  transition: all 0.2s ease;
+}
+
+.edit-imported .nav-pills .nav-link:not(.active) {
+  background-color: #f1f3f5;
+  color: #495057;
+}
+
+.edit-imported .nav-pills .nav-link:not(.active):hover {
+  background-color: #e9ecef;
+  color: #212529;
+}
+
+/* Table tweaks (re-use .exam-table / .room-exam-table เดิมได้เลย) */
+.edit-imported table th,
+.edit-imported table td {
+  vertical-align: middle;
+}
+
+/* Modal */
+.edit-imported .modal-header {
+  background-color: #0d6efd;
+  color: #fff;
+}
+
+.edit-imported .modal-footer button {
+  min-width: 110px;
+}
+
+@media (max-width: 768px) {
+  .edit-imported .edit-card { width: 100%; }
+  .edit-imported table { font-size: 12px; }
+}

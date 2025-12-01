@@ -1,0 +1,30 @@
+@media print {
+    .shipping-label {
+      width: 10cm;
+      height: 4.5cm;
+    }
+  }
+
+/* ปกติแสดงแถวละ 3 ใบบนหน้าจอ */
+.label-wrapper {
+  width: 33.33%;
+}
+
+/* เมื่อพิมพ์ แสดงแถวละ 2 ใบ */
+@media print {
+  .label-wrapper {
+    width: 50%;
+    page-break-inside: avoid;
+  }
+  
+  /* ซ่อนปุ่มพิมพ์เมื่อพิมพ์ PDF */
+  button {
+    display: none;
+  }
+  
+  /* ปรับขนาดคอนเทนเนอร์เพื่อให้พอดีกับหน้ากระดาษ */
+  .container {
+    width: 100%;
+    max-width: none;
+  }
+}

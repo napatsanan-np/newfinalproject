@@ -1,0 +1,89 @@
+/* Search-styles.css */
+
+.container-wide {
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding-top: 100px; /* ปรับลดลงเพื่อให้เนื้อหาไม่ถูกซ่อนใต้ navbar */
+  background: linear-gradient(to right, #c1e1e1, #88d8b0);
+  display: flex;
+  flex-direction: column;
+}
+
+.search-form {
+  padding: 1rem;
+}
+
+.btn {
+  font-size: 1em;
+  min-width: 80px;
+}
+
+/* Exam Search Styles */
+.exam-search-container {
+  width: 100%;
+  overflow-x: auto; /* For responsiveness */
+  margin-top: 2rem;
+}
+
+.exam-search {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 16px;
+  background-color: #ffffff;
+}
+
+.exam-search th, .exam-search td {
+  padding: 12px;
+  text-align: left;
+  border: 1px solid #dee2e6;
+}
+
+.exam-search th {
+  background-color: #f8f9fa;
+  font-weight: bold;
+  cursor: pointer;
+  white-space: nowrap; /* Prevents wrapping of column headers */
+}
+
+.exam-search tbody tr:nth-child(even) {
+  background-color: #f8f9fa;
+}
+
+.exam-search tbody tr:hover {
+  background-color: #e9ecef;
+}
+
+@media (max-width: 768px) {
+  .exam-search {
+    font-size: 0.9em;
+  }
+
+  .exam-search th, .exam-search td {
+    padding: 8px;
+  }
+}
+
+.select__control {
+  font-size: 1em;
+}
+
+.nav-link {
+  font-size: 1em;
+}
+
+
+.card-header {
+  background-color: #f8f9fa;
+}
+
+.card-body {
+  padding: 1.5rem;
+}
+
+@media (max-width: 768px) {
+  .container-wide {
+    padding-left: 15px;
+    padding-right: 15px;
+  }
+}

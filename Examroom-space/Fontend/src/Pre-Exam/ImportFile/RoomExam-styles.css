@@ -1,0 +1,77 @@
+/* RoomExam-styles.css */
+
+.room-exam-container {
+  overflow-x: auto;
+  margin: 0 auto;
+  max-width: 100%;
+  padding: 20px;
+}
+
+.room-exam-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  table-layout: auto; /* Ensure columns adjust based on content */
+}
+
+.room-exam-table th, .room-exam-table td {
+  padding: 10px;
+  width: 70px;
+  text-align: left;
+  border: 1px solid #dee2e6;
+}
+
+.room-exam-table thead th {
+  background-color: #f8f9fa;
+  font-weight: bold;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.room-exam-table tbody tr:nth-child(even) {
+  background-color: #f8f9fa;
+}
+
+.room-exam-table tbody tr:hover {
+  background-color: #e9ecef;
+}
+
+@media screen and (max-width: 768px) {
+  .room-exam-table {
+      font-size: 12px;
+  }
+
+  .room-exam-table th, .room-exam-table td {
+      padding: 8px;
+  }
+}
+
+@media print {
+  .room-exam-container {
+      overflow-x: visible;
+      padding: 0;
+  }
+
+  .room-exam-table {
+      font-size: 10pt;
+      width: 100%;
+      page-break-inside: auto;
+  }
+
+  .room-exam-table th, .room-exam-table td {
+      padding: 5pt;
+  }
+
+  .room-exam-table thead th {
+      background-color: #f8f9fa !important;
+      color: #000 !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+  }
+
+  .room-exam-table tbody tr:nth-child(even) {
+      background-color: #f8f9fa !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+  }
+}

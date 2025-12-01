@@ -1,0 +1,14 @@
+version: "3.8"
+services:
+  web:
+    image: "chiakihanazono/fontend"
+    container_name: Frontend_container
+    environment:
+      - VITE_APP_BACKENDS=${VITE_APP_BACKENDS}
+    ports:
+      - "${WEB_PORT}:80"
+    networks:
+      - examroom-network
+
+networks:
+  examroom-network:

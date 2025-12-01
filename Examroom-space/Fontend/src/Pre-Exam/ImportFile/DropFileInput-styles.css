@@ -1,0 +1,175 @@
+/* DropFileInput-styles.css */
+
+/* เพิ่ม namespace ให้กับทุก style เพื่อป้องกันการชนกับหน้าอื่น */
+.upload-file-component .custom-background {
+  background-color: #f5f7fa;
+  min-height: 100vh;
+}
+
+/* Dropzone Styles */
+.upload-file-component .dropzone {
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  min-height: 300px; /* เพิ่มความสูงขั้นต่ำ */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.upload-file-component .dropzone:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+}
+
+.upload-file-component .active-dropzone {
+  background-color: #e8f4ff !important;
+  border-color: #007bff !important;
+}
+
+.upload-file-component .has-file {
+  background-color: #f0fff4 !important;
+  border-color: #28a745 !important;
+}
+
+.upload-file-component .file-name {
+  word-break: break-all;
+}
+
+/* Progress Bar Styling */
+.upload-file-component .progress {
+  height: 25px;
+  border-radius: 10px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.upload-file-component .progress-bar {
+  font-weight: bold;
+  font-size: 14px;
+}
+
+/* Nav Pills Styling - เฉพาะในคอมโพเนนต์นี้ */
+.upload-file-component .nav-pills .nav-link {
+  border-radius: 8px;
+  padding: 12px 20px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.upload-file-component .nav-pills .nav-link:not(.active) {
+  background-color: #f1f3f5;
+  color: #495057;
+}
+
+.upload-file-component .nav-pills .nav-link:not(.active):hover {
+  background-color: #e9ecef;
+  color: #212529;
+}
+
+/* ปรับความยาวของ Container หลัก */
+.upload-file-component .custom-background {
+  background-color: #f5f7fa;
+  min-height: calc(100vh - 56px); /* หักความสูงของ navbar */
+  padding-bottom: 120px; /* เพิ่มพื้นที่ด้านล่าง */
+}
+
+/* ปรับความยาวของ Card */
+.upload-file-component .upload-card {
+    border-radius: 12px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    min-height: 650px; /* เพิ่มความสูงขั้นต่ำ */
+    width: 1500px;
+    margin: auto; /* จัดให้อยู่ตรงกลาง */
+  }
+  
+
+.upload-file-component .upload-card .card-body {
+  padding: 2.5rem;
+  min-height: 500px; /* เพิ่มความสูงขั้นต่ำ */
+}
+
+/* Button Styling - เฉพาะในคอมโพเนนต์นี้ */
+.upload-file-component .upload-btn {
+  border-radius: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.9rem;
+  letter-spacing: 0.5px;
+  transition: all 0.2s ease-in-out;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.upload-file-component .upload-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.upload-file-component .upload-btn-success {
+  background-color: #28a745;
+  border-color: #28a745;
+}
+
+.upload-file-component .upload-btn-danger {
+  background-color: #dc3545;
+  border-color: #dc3545;
+}
+
+/* Form Select Styling */
+.upload-file-component .custom-select {
+  border-radius: 0 8px 8px 0;
+  height: 50px;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.upload-file-component .custom-input-group-text {
+  border-radius: 8px 0 0 8px;
+  padding: 0 1rem;
+}
+
+/* Empty Data Display */
+.upload-file-component .empty-data {
+  padding: 4rem 0;
+  border-radius: 8px;
+  background-color: #f8f9fa;
+  border: 1px dashed #dee2e6;
+}
+
+/* Spinner */
+.upload-file-component .custom-spinner {
+  width: 3rem;
+  height: 3rem;
+}
+
+/* Badge Styling */
+.upload-file-component .custom-badge {
+  font-weight: normal;
+  font-size: 0.85rem;
+  border-radius: 4px;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .upload-file-component .upload-card .card-body {
+    padding: 1.5rem;
+  }
+  
+  .upload-file-component .dropzone {
+    padding: 2rem !important;
+  }
+  
+  .upload-file-component .upload-btn {
+    width: 100%;
+    margin-bottom: 0.5rem;
+  }
+  
+  .upload-file-component .nav-pills .nav-link {
+    padding: 8px 10px;
+    font-size: 0.9rem;
+  }
+}
