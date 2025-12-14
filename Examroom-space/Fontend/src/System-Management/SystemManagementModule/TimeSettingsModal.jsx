@@ -228,7 +228,7 @@ const ExamConfig = () => {
           <tr key={config.id} className={config.status ? "table-success" : ""}>
             <td className="align-middle">
               <Badge bg="info" className="px-3 py-2">
-                {config.academic_year}/{config.semester}
+                {config.academic_year}/{config.semester}/{config.phase}
               </Badge>
             </td>
             <td className="align-middle">

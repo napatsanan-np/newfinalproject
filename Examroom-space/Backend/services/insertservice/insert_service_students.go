@@ -205,3 +205,125 @@ func (s *UseInsertService) ListDetailExamForEdit(ctx context.Context) ([]models.
 
     return result, nil
 }
+
+
+// ========= ใช้สำหรับหน้าแก้ไขข้อมูลตารางสอบ (examtable) =========
+type ExamtableEditRow struct {
+	Ref      int    `json:"Ref"`
+	Edate    string `json:"Edate"`
+	Etime    string `json:"Etime"`
+	Hr       string `json:"Hr"`
+	Course   string `json:"Course"`
+	Lecturer string `json:"Lecturer"`
+	NoSt     string `json:"No_st"`
+}
+
+func (s *UseInsertService) ListExamtableForEdit(ctx context.Context) ([]ExamtableEditRow, error) {
+	const q = `
+		SELECT 
+			ref,
+			COALESCE(edate, '')      AS edate,
+			COALESCE(etime, '')      AS etime,
+			COALESCE(hr, '')         AS hr,
+			COALESCE(course, '')     AS course,
+			COALESCE(lecturer, '')   AS lecturer,
+			COALESCE(no_st::text,'') AS no_st
+		FROM examtable
+		WHERE id_config = (
+			SELECT id_config FROM exam_config WHERE status = true LIMIT 1
+		)
+		ORDER BY ref ASC;
+	`
+
+	rows, err := s.DB.QueryContext(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []ExamtableEditRow
+	for rows.Next() {
+		var r ExamtableEditRow
+		if err := rows.Scan(
+			&r.Ref,
+			&r.Edate,
+			&r.Etime,
+			&r.Hr,
+			&r.Course,
+			&r.Lecturer,
+			&r.NoSt,
+		); err != nil {
+			return nil, err
+		}
+		result = append(result, r)
+	}
+	return result, rows.Err()
+}
+
+// ========= ใช้สำหรับหน้าแก้ไขข้อมูลห้องสอบ (roomexam) =========
+type RoomexamEditRow struct {
+	No        int    `json:"No"`
+	Ref       int    `json:"Ref"`
+	Edate     string `json:"Edate"`
+	Etime     string `json:"Etime"`
+	Hr        string `json:"Hr"`
+	Course    string `json:"Course"`
+	Lecturer  string `json:"Lecturer"`
+	RoomID    string `json:"Room_id"`
+	Seatrow   string `json:"Seatrow"` 
+	TypeExam  string `json:"Type_exam"`
+	GroupExam string `json:"Group_exam"`
+	NumSt     string `json:"Num_st"`
+}
+
+func (s *UseInsertService) ListRoomexamForEdit(ctx context.Context) ([]RoomexamEditRow, error) {
+	const q = `
+		SELECT
+			no,
+			ref,
+			COALESCE(edate, '')       AS edate,
+			COALESCE(etime, '')       AS etime,
+			COALESCE(hr, '')          AS hr,
+			COALESCE(course, '')      AS course,
+			COALESCE(lecturer, '')    AS lecturer,
+			COALESCE(room_id, '')     AS room_id,
+			COALESCE(seatrow, '')     AS seatrow,
+			COALESCE(type_exam, '')   AS type_exam,
+			COALESCE(group_exam, '')  AS group_exam,
+			COALESCE(num_st::text,'') AS num_st
+		FROM roomexam
+		WHERE id_config = (
+			SELECT id_config FROM exam_config WHERE status = true LIMIT 1
+		)
+		ORDER BY no ASC;
+	`
+
+	rows, err := s.DB.QueryContext(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []RoomexamEditRow
+	for rows.Next() {
+		var r RoomexamEditRow
+		if err := rows.Scan(
+			&r.No,
+			&r.Ref,
+			&r.Edate,
+			&r.Etime,
+			&r.Hr,
+			&r.Course,
+			&r.Lecturer,
+			&r.RoomID,
+			&r.Seatrow,
+			&r.TypeExam,
+			&r.GroupExam,
+			&r.NumSt,
+		); err != nil {
+			return nil, err
+		}
+		result = append(result, r)
+	}
+	return result, rows.Err()
+}

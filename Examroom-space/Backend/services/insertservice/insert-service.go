@@ -27,12 +27,13 @@ func (s *UseInsertService) Insert_System(data models.ExamConfig) error {
 			exam_period_start,
 			exam_period_end,
 			status , 
-			backup_exam
-		) VALUES ($1, $2, $3, $4, $5, $6 , $7 , $8)
+			backup_exam,
+			phase
+		) VALUES ($1, $2, $3, $4, $5, $6 , $7 , $8, $9)
 	`
 
 	// Execute the insert query
-	_, err = s.DB.Exec(query, data.AcademicYear, data.Semester, data.PrepPeriodStart, data.PrepPeriodEnd, data.ExamPeriodStart, data.ExamPeriodEnd, true, 3)
+	_, err = s.DB.Exec(query, data.AcademicYear, data.Semester, data.PrepPeriodStart, data.PrepPeriodEnd, data.ExamPeriodStart, data.ExamPeriodEnd, true, 3, data.Phase)
 	if err != nil {
 		log.Println("Error executing query:", err)
 		return err

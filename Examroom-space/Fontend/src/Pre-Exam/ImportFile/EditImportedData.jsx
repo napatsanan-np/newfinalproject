@@ -41,7 +41,7 @@ const toIntIfNeeded = (obj, numberKeys = []) => {
 };
 
 /* =========================================================
- * 1) ตารางสอบ (examtable)
+ * 1) ตารางสอบ (examtable)  -> มี No_st
  * ========================================================= */
 const Examtable = () => {
   const [rows, setRows] = useState([]);
@@ -56,12 +56,14 @@ const Examtable = () => {
     Hr: "",
     Course: "",
     Lecturer: "",
+    No_st: "",
   });
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${URL}/select_data/examtable`, {
+      // 🔹 ใช้ API ใหม่ที่มี No_st
+      const res = await axios.get(`${URL}/select_data/examtable_all`, {
         headers: authHeaders,
       });
       setRows(Array.isArray(res.data) ? res.data : []);
@@ -85,19 +87,20 @@ const Examtable = () => {
 
   const openModal = (row) => {
     setForm({
-      Ref: row.Ref ?? "",
-      Edate: row.Edate ?? "",
-      Etime: row.Etime ?? "",
-      Hr: row.Hr ?? "",
-      Course: row.Course ?? "",
-      Lecturer: row.Lecturer ?? "",
+      Ref: row.Ref ?? row.ref ?? "",
+      Edate: row.Edate ?? row.edate ?? "",
+      Etime: row.Etime ?? row.etime ?? "",
+      Hr: row.Hr ?? row.hr ?? "",
+      Course: row.Course ?? row.course ?? "",
+      Lecturer: row.Lecturer ?? row.lecturer ?? "",
+      No_st: row.No_st ?? row.no_st ?? "",
     });
     setOpen(true);
   };
 
   const save = async () => {
     try {
-      const payload = toIntIfNeeded(form, ["Ref", "Hr"]);
+      const payload = toIntIfNeeded(form, ["Ref", "Hr", "No_st"]);
       await axios.post(`${URL}/admin/update/examtable`, payload, {
         headers: authHeaders,
       });
@@ -129,16 +132,18 @@ const Examtable = () => {
         <Table striped bordered hover responsive>
           <thead>
             <tr>
-              <th style={{ width: 100 }}>Ref</th>
+              <th style={{ width: 80 }}>Ref</th>
               <th>Course</th>
+              <th style={{ width: 90 }}>No_st</th>
               <th style={{ width: 120 }}>Action</th>
             </tr>
           </thead>
           <tbody>
             {filtered.map((r) => (
-              <tr key={r.Ref}>
-                <td>{r.Ref}</td>
-                <td>{r.Course}</td>
+              <tr key={r.Ref ?? r.ref}>
+                <td>{r.Ref ?? r.ref}</td>
+                <td>{r.Course ?? r.course}</td>
+                <td>{r.No_st ?? r.no_st}</td>
                 <td>
                   <Button size="sm" onClick={() => openModal(r)}>
                     แก้ไข
@@ -179,7 +184,7 @@ const Examtable = () => {
 };
 
 /* =========================================================
- * 2) ห้องสอบ (roomexam)
+ * 2) ห้องสอบ (roomexam) -> ใช้ Num_st
  * ========================================================= */
 const Roomexam = () => {
   const [rows, setRows] = useState([]);
@@ -199,12 +204,14 @@ const Roomexam = () => {
     Seatrow: "",
     Type_exam: "",
     Group_exam: "",
+    Num_st: "",
   });
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${URL}/select_data/roomexam`, {
+      // 🔹 ใช้ API ใหม่ที่มี Num_st
+      const res = await axios.get(`${URL}/select_data/roomexam_all`, {
         headers: authHeaders,
       });
       setRows(Array.isArray(res.data) ? res.data : []);
@@ -228,24 +235,31 @@ const Roomexam = () => {
 
   const openModal = (row) => {
     setForm({
-      No: row.No ?? "",
-      Ref: row.Ref ?? "",
-      Edate: row.Edate ?? "",
-      Etime: row.Etime ?? "",
-      Hr: row.Hr ?? "",
-      Course: row.Course ?? "",
-      Lecturer: row.Lecturer ?? "",
-      Room_id: row.Room_id ?? "",
-      Seatrow: row.Seatrow ?? "",
-      Type_exam: row.Type_exam ?? "",
-      Group_exam: row.Group_exam ?? "",
+      No: row.No ?? row.no ?? "",
+      Ref: row.Ref ?? row.ref ?? "",
+      Edate: row.Edate ?? row.edate ?? "",
+      Etime: row.Etime ?? row.etime ?? "",
+      Hr: row.Hr ?? row.hr ?? "",
+      Course: row.Course ?? row.course ?? "",
+      Lecturer: row.Lecturer ?? row.lecturer ?? "",
+      Room_id: row.Room_id ?? row.room_id ?? "",
+      Seatrow: row.Seatrow ?? row.seatrow ?? "",
+      Type_exam: row.Type_exam ?? row.type_exam ?? "",
+      Group_exam: row.Group_exam ?? row.group_exam ?? "",
+      Num_st: row.Num_st ?? row.num_st ?? "",
     });
     setOpen(true);
   };
 
   const save = async () => {
     try {
-      const payload = toIntIfNeeded(form, ["No", "Ref", "Hr", "Room_id"]);
+      const payload = toIntIfNeeded(form, [
+        "No",
+        "Ref",
+        "Hr",
+        "Room_id",
+        "Num_st",
+      ]);
       await axios.post(`${URL}/admin/update/roomexam`, payload, {
         headers: authHeaders,
       });
@@ -277,18 +291,20 @@ const Roomexam = () => {
         <Table striped bordered hover responsive>
           <thead>
             <tr>
-              <th style={{ width: 90 }}>No</th>
-              <th style={{ width: 100 }}>Ref</th>
+              <th style={{ width: 70 }}>No</th>
+              <th style={{ width: 70 }}>Ref</th>
               <th>Course</th>
+              <th style={{ width: 90 }}>Num_st</th>
               <th style={{ width: 120 }}>Action</th>
             </tr>
           </thead>
           <tbody>
             {filtered.map((r, idx) => (
-              <tr key={`${r.No}-${r.Ref}-${idx}`}>
-                <td>{r.No}</td>
-                <td>{r.Ref}</td>
-                <td>{r.Course}</td>
+              <tr key={`${r.No ?? r.no}-${r.Ref ?? r.ref}-${idx}`}>
+                <td>{r.No ?? r.no}</td>
+                <td>{r.Ref ?? r.ref}</td>
+                <td>{r.Course ?? r.course}</td>
+                <td>{r.Num_st ?? r.num_st}</td>
                 <td>
                   <Button size="sm" onClick={() => openModal(r)}>
                     แก้ไข
@@ -328,10 +344,7 @@ const Roomexam = () => {
   );
 };
 
-/* =========================================================
- * 3) รายละเอียดข้อสอบ (detail_exam)
- *   map key จาก backend (ตัวเล็ก) → form (ตัวใหญ่)
- * ========================================================= */
+/* ===== 3) รายละเอียดข้อสอบ (detail_exam) เหมือนเวอร์ชันก่อน ===== */
 const DetailExam = () => {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -406,7 +419,6 @@ const DetailExam = () => {
 
   const save = async () => {
     try {
-      // ตอนนี้ payload ใช้ชื่อแบบ form (ตัวใหญ่)
       const payload = toIntIfNeeded(form, ["Ref", "Copy", "Page", "Qty", "No_st"]);
 
       await axios.post(`${URL}/admin/update/detail_exam`, payload, {

@@ -125,8 +125,10 @@ func SetupRoutes(r *gin.Engine, db *sql.DB) {
 		protected.POST("/admin/update/roomexam", examController.UpdateRoomExamNew)
 		protected.POST("/admin/update/detail_exam", examController.UpdateDetailExamNew)
 
-		// แก้ไข/อัปเดตเงื่อนไขกรรมการคุมสอบ
+		//ลองสร้างมาใหม่อันเก่าไม่รู้ทำไมดึงไม่ได้
 		protected.GET("/select_data/detail_exam_all", examController.GetDetailExamForEdit)
+		protected.GET("/select_data/examtable_all", examController.GetExamtableForEdit)
+		protected.GET("/select_data/roomexam_all", examController.GetRoomexamForEdit)
 
 
 		protected.POST("/admin/update/condition_proctor", examController.UpdateConditionProctorNew)

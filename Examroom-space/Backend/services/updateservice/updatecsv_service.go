@@ -31,7 +31,7 @@ func (i *IntLike) UnmarshalJSON(b []byte) error {
 }
 func (i IntLike) Int() int { return int(i) }
 
-// -------------------- Request structs (แบบ int ล้วน) --------------------
+// ✅ ตารางสอบ: ใช้ No_st
 type UpdateExamTableReq struct {
 	Ref      int    `json:"Ref" binding:"required"`
 	Course   string `json:"Course"`
@@ -39,9 +39,10 @@ type UpdateExamTableReq struct {
 	Etime    string `json:"Etime"`
 	Hr       int    `json:"Hr"`
 	Lecturer string `json:"Lecturer"`
-	NumSt    int    `json:"NumSt"`
+	NoSt     int    `json:"No_st"` // ← เดิมเป็น NumSt / "NumSt"
 }
 
+// ✅ ห้องสอบ: ใช้ Num_st
 type UpdateRoomExamReq struct {
 	No       int    `json:"No" binding:"required"`
 	Ref      int    `json:"Ref"`
@@ -50,7 +51,7 @@ type UpdateRoomExamReq struct {
 	Hr       int    `json:"Hr"`
 	Course   string `json:"Course"`
 	Lecturer string `json:"Lecturer"`
-	NumSt    int    `json:"NumSt"`
+	NumSt    int    `json:"Num_st"` // ← เดิมเป็น "NumSt"
 
 	RoomID    *int   `json:"Room_id,omitempty"`
 	Seatrow   string `json:"Seatrow,omitempty"`
@@ -105,7 +106,7 @@ func (s *Userupdateservice) UpdateExamTable(req UpdateExamTableReq) error {
          WHERE id_config=$7 AND ref=$8;
     `
 	_, err = s.DB.ExecContext(ctx, query,
-		req.Course, req.Edate, req.Etime, req.Hr, req.Lecturer, req.NumSt,
+		req.Course, req.Edate, req.Etime, req.Hr, req.Lecturer, req.NoSt, // ← ใช้ NoSt
 		idConfig, req.Ref,
 	)
 	return err
@@ -125,14 +126,14 @@ func (s *Userupdateservice) UpdateRoomExamFields(req UpdateRoomExamReq) error {
          WHERE id_config=$8 AND no=$9;
     `
 	_, err = s.DB.ExecContext(ctx, query,
-		req.Ref, req.Edate, req.Etime, req.Hr, req.Course, req.Lecturer, req.NumSt,
+		req.Ref, req.Edate, req.Etime, req.Hr, req.Course, req.Lecturer, req.NumSt, // ← ใช้ NumSt ที่ map จาก Num_st
 		idConfig, req.No,
 	)
 	if err != nil {
 		return err
 	}
 
-	// ฟิลด์เสริม
+	// ฟิลด์เสริมเหมือนเดิม
 	if req.RoomID != nil {
 		_, _ = s.DB.ExecContext(ctx,
 			`UPDATE roomexam SET room_id=$1 WHERE id_config=$2 AND no=$3`,
@@ -156,7 +157,8 @@ func (s *Userupdateservice) UpdateRoomExamFields(req UpdateRoomExamReq) error {
 	return nil
 }
 
-// -------------------- Update DetailExam --------------------
+
+
 func (s *Userupdateservice) UpdateDetailExam(req UpdateDetailExamReq) error {
 	ctx := context.Background()
 	idConfig, err := s.currentConfigID(ctx)
@@ -177,7 +179,6 @@ func (s *Userupdateservice) UpdateDetailExam(req UpdateDetailExamReq) error {
 		return err
 	}
 
-	// ฟิลด์เสริม
 	if req.SubDate != "" {
 		_, _ = s.DB.ExecContext(ctx,
 			`UPDATE detail_exam SET sub_date=$1 WHERE id_config=$2 AND id=$3`,

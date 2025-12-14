@@ -21,6 +21,7 @@ const SystemManagement = () => {
         prep_period_end: '',
         exam_period_start: '',
         exam_period_end: '',
+        phase: '',
     });
 
     const [modules, setModules] = useState([
@@ -28,6 +29,11 @@ const SystemManagement = () => {
         { id: 2, name: 'หน้าสำหรับส่งข้อสอบโดยอาจารย์ผู้สอน', status: true },
         { id: 3, name: 'หน้าสำหรับกรรมการเช็คตารางคุม', status: false }
     ]);
+
+
+    const [errors, setErrors] = useState({
+        phase: false,
+    });
 
     const handleTimeChange = (field, value) => {
         setExamConfig(prev => ({
@@ -48,6 +54,12 @@ const SystemManagement = () => {
 
     const handleTimeSubmit = async (e) => {
         e.preventDefault();
+        // ถ้าไม่ได้เลือก Phase ให้ขึ้น error ที่ช่อง Phase
+        if (!examConfig.phase || examConfig.phase.trim() === "") {
+            setErrors((prev) => ({ ...prev, phase: true }));
+            alert("กรุณาเลือก Phase");
+            return;
+        }
 
         // Validate input
         const isValid = examConfig.prep_period_start && examConfig.prep_period_end && new Date(examConfig.prep_period_start) < new Date(examConfig.prep_period_end)
@@ -57,15 +69,15 @@ const SystemManagement = () => {
             alert('โปรดตรวจสอบช่วงเวลาให้ถูกต้อง (วันเริ่มต้นต้องน้อยกว่าวันสิ้นสุด)');
             return;
         }
-        console.log("Api" , localStorage.getItem("API") + '/SetSystemmanagement')
+        console.log("Api", localStorage.getItem("API") + '/SetSystemmanagement')
         try {
-            await axios.post(localStorage.getItem("API")   + '/SetSystemmanagement', examConfig , {
+            await axios.post(localStorage.getItem("API") + '/SetSystemmanagement', examConfig, {
                 method: "POST",
                 headers: {
-                  Authorization: `Bearer ${localStorage.getItem("token")}`,
-                  "Content-Type": "application/json",
+                    Authorization: `Bearer ${localStorage.getItem("token")}`,
+                    "Content-Type": "application/json",
                 },
-              });
+            });
             alert('การตั้งค่าช่วงเวลาถูกบันทึกเรียบร้อยแล้ว');
         } catch (error) {
             console.error('Error saving time settings:', error.response.data.error);
@@ -78,17 +90,35 @@ const SystemManagement = () => {
         const payload = {
             academicYear: examConfig.academic_year,
             semester: examConfig.semester,
+            phase: examConfig.phase,
             modules
         };
+        const validateForm = () => {
+            let newErrors = {};
+
+            if (!examConfig.phase || examConfig.phase.trim() === "") {
+                newErrors.phase = true;
+            }
+
+            setErrors(newErrors);
+            return Object.keys(newErrors).length === 0;
+        };
+
+        const handleSave = () => {
+            if (!validateForm()) return;   // ถ้าไม่ผ่าน validation ให้หยุดเลย
+
+            saveConfig(); // ฟังก์ชันเดิมที่ยิง API
+        };
+
 
         try {
-            await axios.post( localStorage.getItem("API") + '/SetSystemmanagement', payload , {
+            await axios.post(localStorage.getItem("API") + '/SetSystemmanagement', payload, {
                 method: "POST",
                 headers: {
-                  Authorization: `Bearer ${localStorage.getItem("token")}`,
-                  "Content-Type": "application/json",
+                    Authorization: `Bearer ${localStorage.getItem("token")}`,
+                    "Content-Type": "application/json",
                 },
-              });
+            });
             alert('การตั้งค่าโมดูลถูกบันทึกเรียบร้อยแล้ว');
         } catch (error) {
             console.error('Error saving module settings:', error);
@@ -111,18 +141,18 @@ const SystemManagement = () => {
                                 <Col md={6}>
                                     <Form.Group className="mb-3">
 
-                                    <Form.Group className="mb-3">
-    <Form.Label>ปีการศึกษา</Form.Label>
-    <Form.Select
-        value={examConfig.academic_year}
-        onChange={(e) => setExamConfig({ ...examConfig, academic_year: e.target.value })}
-    >
-        <option value="">เลือกปีการศึกษา</option>
-        {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() + 543  + 1 - i).map((year) => (
-            <option key={year} value={year}>{year}</option>
-        ))}
-    </Form.Select>
-</Form.Group>
+                                        <Form.Group className="mb-3">
+                                            <Form.Label>ปีการศึกษา</Form.Label>
+                                            <Form.Select
+                                                value={examConfig.academic_year}
+                                                onChange={(e) => setExamConfig({ ...examConfig, academic_year: e.target.value })}
+                                            >
+                                                <option value="">เลือกปีการศึกษา</option>
+                                                {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() + 543 + 1 - i).map((year) => (
+                                                    <option key={year} value={year}>{year}</option>
+                                                ))}
+                                            </Form.Select>
+                                        </Form.Group>
                                     </Form.Group>
                                 </Col>
                                 <Col md={6}>
@@ -137,6 +167,30 @@ const SystemManagement = () => {
                                         />
                                     </Form.Group>
                                 </Col>
+                                <Col md={6}>
+                                    <Form.Group className="mb-3">
+                                        <Form.Label>Phase (ช่วงสอบ)</Form.Label>
+                                        <Form.Select
+                                            value={examConfig.phase}
+                                            onChange={(e) => {
+                                                setExamConfig({ ...examConfig, phase: e.target.value });
+                                                setErrors((prev) => ({ ...prev, phase: false })); // เคลียร์ error เมื่อมีการเลือก
+                                            }}
+                                            isInvalid={errors.phase} //ทำให้ขึ้นกรอบแดง
+                                        >
+                                            <option value="">เลือก Phase</option>
+                                            <option value="กลางภาค">กลางภาค</option>
+                                            <option value="ปลายภาค">ปลายภาค</option>
+                                        </Form.Select>
+
+
+                                        <Form.Control.Feedback type="invalid">
+                                            กรุณาเลือก Phase
+                                        </Form.Control.Feedback>
+
+                                    </Form.Group>
+                                </Col>
+
                             </Row>
                         </Card.Body>
                     </Card>
@@ -200,7 +254,7 @@ const SystemManagement = () => {
                                     </Row>
                                 </Form.Group>
 
-                                
+
                                 <div style={{ display: 'flex', gap: '10px', justifyContent: 'left', alignItems: 'center' }}>
                                     <Button style={{ width: "200px" }} variant="primary" type="submit">
                                         บันทึกการตั้งค่าเวลา
@@ -216,7 +270,7 @@ const SystemManagement = () => {
                     </Card>
 
                     {/* Module Management */}
-                    
+
                 </Container>
             </div>
         </>

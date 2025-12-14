@@ -132,6 +132,7 @@ type ExamConfig struct {
 	Id_config       int    `json:"id_config"`
 	AcademicYear    string `json:"academic_year"`
 	Semester        string `json:"semester"`
+	Phase           string `json:"phase"`
 	PrepPeriodStart string `json:"prep_period_start"`
 	PrepPeriodEnd   string `json:"prep_period_end"`
 	ExamPeriodStart string `json:"exam_period_start"`

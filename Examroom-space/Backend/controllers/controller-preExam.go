@@ -508,3 +508,31 @@ func (ctrl *Controller) GetDetailExamForEdit(c *gin.Context) {
 
 	c.JSON(http.StatusOK, data)
 }
+
+// ดึงข้อมูล examtable สำหรับหน้าแก้ไข (มี No_st)
+func (ctrl *Controller) GetExamtableForEdit(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	data, err := ctrl.Insertservice.ListExamtableForEdit(ctx)
+	if err != nil {
+		log.Println("GetExamtableForEdit error:", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, data)
+}
+
+// ดึงข้อมูล roomexam สำหรับหน้าแก้ไข (มี Num_st)
+func (ctrl *Controller) GetRoomexamForEdit(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	data, err := ctrl.Insertservice.ListRoomexamForEdit(ctx)
+	if err != nil {
+		log.Println("GetRoomexamForEdit error:", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, data)
+}
