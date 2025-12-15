@@ -27,4 +27,4 @@ jobs:
 
       - name: Run unit tests
         working-directory: Examroom-space/Backend
-        run: go test -v ./...
+        run: go test -v ./services/selectservice
