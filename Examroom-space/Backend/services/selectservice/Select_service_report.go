@@ -167,15 +167,26 @@ func (s *UserSelectService) GetExamSubmissionStats(academicYear, semester string
 		deptData := departments[deptCode]
 		deptData["total_exams"] = deptData["total_exams"].(int) + 1
 
-		// สถานะจะเป็นไปตามค่าในฐานข้อมูล
-		if submitStatus == "ส่งแล้ว" {
-			deptData["submitted"] = deptData["submitted"].(int) + 1
-		} else if submitStatus == "มีสอบแต่ไม่มีข้อสอบส่ง" {
-			// กรณีใหม่ที่เราต้องใส่ค่ามือในฐานข้อมูล หรือเช็คจาก page == 0
-			deptData["no_exam"] = deptData["no_exam"].(int) + 1
-		} else {
-			deptData["pending"] = deptData["pending"].(int) + 1
-		}
+		// // สถานะจะเป็นไปตามค่าในฐานข้อมูล
+		// if submitStatus == "ส่งแล้ว" {
+		// 	deptData["submitted"] = deptData["submitted"].(int) + 1
+		// } else if submitStatus == "มีสอบแต่ไม่มีข้อสอบส่ง" {
+		// 	// กรณีใหม่ที่เราต้องใส่ค่ามือในฐานข้อมูล หรือเช็คจาก page == 0
+		// 	deptData["no_exam"] = deptData["no_exam"].(int) + 1
+		// } else {
+		// 	deptData["pending"] = deptData["pending"].(int) + 1
+		// }
+			
+		statusType := classifySubmissionStatus(submitStatus)
+
+	switch statusType {
+	case "submitted":
+		deptData["submitted"] = deptData["submitted"].(int) + 1
+	case "no_exam":
+		deptData["no_exam"] = deptData["no_exam"].(int) + 1
+	default:
+		deptData["pending"] = deptData["pending"].(int) + 1
+	}
 
 		deptData["courses"] = append(deptData["courses"].([]map[string]interface{}), map[string]interface{}{
 			"course_code":     course,

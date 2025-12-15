@@ -10,5 +10,5 @@ jobs:
   hello:
     runs-on: ubuntu-latest
     steps:
-      - name: Say hello
-        run: echo "Hello World from Exam Room CI!"
+      - name: hello 1
+        run: echo "Hello Naaaaa"
