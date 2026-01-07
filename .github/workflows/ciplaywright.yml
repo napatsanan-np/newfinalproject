@@ -14,32 +14,27 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ไม่ต้อง cache เพื่อตัดปัญหาเดิมออกให้จบ
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 18
 
-      # ติดตั้ง dependency สำหรับรัน Playwright (เฉพาะฝั่ง test)
-      - name: Install dependencies (Fontend)
-        working-directory: Fontend
+      # ติดตั้ง dependency สำหรับ playwright (จาก root)
+      - name: Install dependencies
         run: npm ci
 
       - name: Install Playwright browsers
-        working-directory: Fontend
         run: npx playwright install --with-deps
 
-      # สตาร์ทระบบเหมือนที่คุณรันจริง
+      # สตาร์ทระบบด้วย docker-compose แบบที่คุณใช้จริง
       - name: Build & Start Docker Compose
         run: docker compose up -d --build
 
-      # รอให้หน้าเว็บขึ้น (ปรับ URL ตามพอร์ตจริงของคุณ)
+      # รอให้เว็บขึ้น (แก้ port ถ้าไม่ใช่ 3000)
       - name: Wait for Frontend
-        working-directory: Fontend
         run: npx wait-on http://127.0.0.1:3000
 
       - name: Run Playwright tests
-        working-directory: Fontend
         run: npx playwright test
 
       - name: Upload Playwright report
@@ -47,9 +42,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: Fontend/playwright-report/
+          path: playwright-report/
 
-      # กัน resource ค้าง
       - name: Docker logs (on failure)
         if: failure()
         run: docker compose logs --no-color
