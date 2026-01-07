@@ -1,47 +1,30 @@
-name: ci Playwright
+name: CI - Go Unit Tests
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
+    paths:
+      - "Examroom-space/Backend/**"
+      - ".github/workflows/**"
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
+    paths:
+      - "Examroom-space/Backend/**"
+      - ".github/workflows/**"
 
 jobs:
-  test:
+  unit-test:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
         with:
-          node-version: 18
-          cache: 'npm'
+          go-version: "1.22"
 
-      - name: Install dependencies
-        run: npm install
-
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps
-
-      - name: Build frontend
-        run: npm run build
-        env:
-          CI: true
-
-      - name: Start frontend
-        run: |
-          npm start &
-          npx wait-on http://localhost:3000
-
-      - name: Run Playwright tests
-        run: npx playwright test
-
-      - name: Upload Playwright report
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report
-          path: playwright-report/
+      - name: Run unit tests
+        working-directory: Examroom-space/Backend
+        run: go test -v ./services/selectservice
