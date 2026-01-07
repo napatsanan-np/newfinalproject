@@ -1,4 +1,4 @@
-name: CI Docker + Playwright (Fontend)
+name: CI Docker + Playwright (Examroom-space)
 
 on:
   push:
@@ -14,43 +14,42 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # เช็คโครงสร้างที่เราจะใช้ (กันพลาดเรื่องสะกดชื่อโฟลเดอร์)
       - name: Verify project structure
         run: |
           echo "=== Repo root ==="
           ls -la
+          echo "=== Examroom-space ==="
+          ls -la Examroom-space
           echo "=== Fontend ==="
-          ls -la Fontend
-          test -f Fontend/package.json
-          test -f Fontend/package-lock.json
-          test -f Fontend/playwright.config.mjs
-          test -f docker-compose.yml
+          ls -la Examroom-space/Fontend
+          test -f Examroom-space/Fontend/package.json
+          test -f Examroom-space/Fontend/package-lock.json
+          test -f Examroom-space/Fontend/playwright.config.mjs
+          test -f Examroom-space/docker-compose.yml
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 18
 
-      # ติดตั้ง dependency ของฝั่ง Fontend (ที่มี lockfile จริง)
       - name: Install dependencies (Fontend)
-        working-directory: Fontend
+        working-directory: Examroom-space/Fontend
         run: npm ci
 
       - name: Install Playwright browsers
-        working-directory: Fontend
+        working-directory: Examroom-space/Fontend
         run: npx playwright install --with-deps
 
-      # สตาร์ทระบบด้วย docker compose จาก root (เหมือนที่คุณรันจริง)
       - name: Build & Start Docker Compose
+        working-directory: Examroom-space
         run: docker compose -f docker-compose.yml up -d --build
 
-      # รอหน้าเว็บขึ้น (จาก test ของคุณใช้ localhost:3000)
       - name: Wait for Frontend
-        working-directory: Fontend
+        working-directory: Examroom-space/Fontend
         run: npx wait-on http://127.0.0.1:3000
 
       - name: Run Playwright tests
-        working-directory: Fontend
+        working-directory: Examroom-space/Fontend
         run: npx playwright test
 
       - name: Upload Playwright report
@@ -58,12 +57,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: Fontend/playwright-report/
+          path: Examroom-space/Fontend/playwright-report/
 
       - name: Docker logs (on failure)
         if: failure()
+        working-directory: Examroom-space
         run: docker compose -f docker-compose.yml logs --no-color
 
       - name: Shutdown
         if: always()
+        working-directory: Examroom-space
         run: docker compose -f docker-compose.yml down
