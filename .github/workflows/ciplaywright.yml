@@ -41,7 +41,7 @@ jobs:
         run: npx playwright install --with-deps
 
       - name: Build backend Docker image
-        working-directory: Examroom-space/backend
+        working-directory: Examroom-space/Backend
         run: docker build -t local/backend:fixed .
 
       - name: Build frontend Docker image
