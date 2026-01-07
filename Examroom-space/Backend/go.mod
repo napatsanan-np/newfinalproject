@@ -3,6 +3,7 @@ module github.com
 go 1.23.0
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/coreos/go-oidc v2.3.0+incompatible
 	github.com/gin-gonic/gin v1.10.0
 	github.com/golang-jwt/jwt/v5 v5.2.1

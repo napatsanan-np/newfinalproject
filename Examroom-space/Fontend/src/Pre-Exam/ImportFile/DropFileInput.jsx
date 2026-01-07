@@ -196,140 +196,140 @@ export default function UploadFile() {
   // พร้อมตรวจ id_config + ตีความ Error Message ให้ตรงปัญหา
   // -------------------------------------------------------------------
   const handleUpload = async () => {
-    try {
-      // 1) ตรวจสอบก่อนว่ามี id_config หรือยัง
-      const idConfig = localStorage.getItem("id_config");
-      if (!idConfig) {
-        Swal.fire({
-          title: "ยังไม่ได้ตั้งค่าระบบสอบ",
-          html: `
-            <p>ระบบตรวจพบว่ายังไม่ได้เลือกระบบสอบ (id_config) ก่อนนำเข้าไฟล์</p>
-            <hr/>
-            <p class="text-start">
-              <strong>วิธีแก้ปัญหา:</strong><br/>
-              - ไปที่หน้า <b>ตั้งค่าระบบสอบ</b><br/>
-              - เลือกปีการศึกษา / ภาคการศึกษา / รอบสอบให้เรียบร้อย<br/>
-              - จากนั้นกลับมาที่หน้านี้แล้วอัปโหลดไฟล์อีกครั้ง
-            </p>
-          `,
-          icon: "warning",
-          confirmButtonColor: "#f0ad4e",
-        });
-        return; // ❗ ไม่ยิง API ถ้ายังไม่ได้ตั้งค่าระบบ
-      }
-
-      // 2) ตรวจว่ามีไฟล์จริง ๆ หรือไม่ (กันไว้กรณีเรียกตรง)
-      if (!file) {
-        Swal.fire({
-          title: "ข้อผิดพลาด",
-          text: "กรุณาเลือกไฟล์ก่อนอัพโหลด",
-          icon: "error",
-          confirmButtonColor: "#dc3545",
-        });
-        return;
-      }
-
-      // 3) เริ่มอัปโหลดไฟล์
-      setIsLoading(true);
-      const formData = new FormData();
-      formData.append("FileExcel", file);
-
-      await axios.post(`${URL}/upload`, formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-          Authorization: `Bearer ${token}`,
-        },
-        onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round(
-            (progressEvent.loaded * 100) / progressEvent.total
-          );
-          setProgress(percentCompleted);
-        },
-      });
-
-      // 4) รีเฟรชข้อมูลหลังอัปโหลดเสร็จ
-      await GetDataFromApi();
-
-      Swal.fire({
-        title: "สำเร็จ",
-        text: "อัพโหลดไฟล์สำเร็จ",
-        icon: "success",
-        confirmButtonColor: "#28a745",
-      });
-
-      setProgress(0);
-      setFile(null);
-      setFileName("");
-    } catch (error) {
-      console.log("ERROR FROM UPLOAD csv ::", error?.response?.data);
-
-      // 5) แยกเคส Error ให้ตรงสถานการณ์
-
-      // 5.1 กรณี Network / server ไม่ตอบเลย
-      if (!error.response) {
-        Swal.fire({
-          title: "ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้",
-          html: `
-            <p>ระบบไม่สามารถอัปโหลดไฟล์เข้าสู่เซิร์ฟเวอร์ได้</p>
-            <hr/>
-            <p class="text-start">
-              <strong>วิธีแก้ปัญหา:</strong><br/>
-              - ตรวจสอบการเชื่อมต่ออินเทอร์เน็ตของคุณ<br/>
-              - ลองกดรีเฟรชหน้าเว็บแล้วอัปโหลดใหม่อีกครั้ง<br/>
-              - หากยังไม่ได้ กรุณาแจ้งผู้ดูแลระบบตรวจสอบเซิร์ฟเวอร์
-            </p>
-          `,
-          icon: "error",
-          confirmButtonColor: "#dc3545",
-        });
-        return;
-      }
-
-      const backendError = error.response.data || {};
-      const backendMessage = backendError.error || "";
-
-      // 5.2 ถ้า backend ส่ง Internal Server Error มา
-      // แต่เราอยากให้ user ได้ข้อความที่เข้าใจง่าย + วิธีแก้
-      if (backendMessage === "Internal Server Error") {
-        Swal.fire({
-          title: "เกิดข้อผิดพลาดระหว่างประมวลผลไฟล์",
-          html: `
-            <p>ระบบไม่สามารถประมวลผลไฟล์ที่อัปโหลดได้</p>
-            <hr/>
-            <p class="text-start">
-              <strong>วิธีแก้ปัญหา:</strong><br/>
-              - ตรวจสอบว่าไฟล์เป็นนามสกุล <b>.xlsx</b> ตามแบบฟอร์มที่ระบบกำหนด<br/>
-              - ตรวจสอบว่าไม่มีการลบหัวตาราง หรือแก้โครงสร้างคอลัมน์ผิดไปจากไฟล์ตัวอย่าง<br/>
-              - ลองแก้ไขไฟล์ให้ถูกต้องแล้วอัปโหลดใหม่อีกครั้ง<br/>
-              - หากยังมีปัญหา กรุณาติดต่อผู้ดูแลระบบเพื่อตรวจสอบรายละเอียดเพิ่มเติม
-            </p>
-          `,
-          icon: "error",
-          confirmButtonColor: "#dc3545",
-        });
-        return;
-      }
-
-      // 5.3 กรณีอื่น ๆ ใช้ข้อความจาก backend + วิธีแก้ทั่วไป
-      Swal.fire({
-        title: "ข้อผิดพลาดในการอัปโหลดไฟล์",
+  try {
+    // 1) ตรวจสอบก่อนว่ามี id_config หรือยัง (เตือนแบบไม่บล็อค)
+    const idConfig = localStorage.getItem("id_config");
+    if (!idConfig) {
+      await Swal.fire({
+        title: "ยังไม่ได้ตั้งค่าระบบ (คำเตือน)",
         html: `
-          <p>${backendMessage || "การอัพโหลดไฟล์มีปัญหา"}</p>
+          <p>ระบบยังไม่พบค่า <b>id_config</b> แต่คุณสามารถลองอัปโหลดไฟล์ได้ตามปกติ</p>
+          <hr/>
+          <p class="text-start">
+            <strong>แนะนำ:</strong><br/>
+            - หากอัปโหลดแล้วมีปัญหา ให้ไปที่หน้า <b>ตั้งค่าระบบ</b> และเลือกปี/ภาค/รอบสอบ<br/>
+            - แล้วกลับมาหน้านี้เพื่ออัปโหลดใหม่อีกครั้ง
+          </p>
+        `,
+        icon: "warning",
+        confirmButtonColor: "#f0ad4e",
+      });
+      // ✅ ไม่ return ปล่อยให้อัปโหลดต่อได้เหมือนเดิม
+    }
+
+    // 2) ตรวจว่ามีไฟล์จริง ๆ หรือไม่ (กันไว้กรณีเรียกตรง)
+    if (!file) {
+      Swal.fire({
+        title: "ข้อผิดพลาด",
+        text: "กรุณาเลือกไฟล์ก่อนอัพโหลด",
+        icon: "error",
+        confirmButtonColor: "#dc3545",
+      });
+      return;
+    }
+
+    // 3) เริ่มอัปโหลดไฟล์
+    setIsLoading(true);
+    const formData = new FormData();
+    formData.append("FileExcel", file);
+
+    await axios.post(`${URL}/upload`, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+        Authorization: `Bearer ${token}`,
+      },
+      onUploadProgress: (progressEvent) => {
+        const percentCompleted = Math.round(
+          (progressEvent.loaded * 100) / progressEvent.total
+        );
+        setProgress(percentCompleted);
+      },
+    });
+
+    // 4) รีเฟรชข้อมูลหลังอัปโหลดเสร็จ
+    await GetDataFromApi();
+
+    Swal.fire({
+      title: "สำเร็จ",
+      text: "อัพโหลดไฟล์สำเร็จ",
+      icon: "success",
+      confirmButtonColor: "#28a745",
+    });
+
+    setProgress(0);
+    setFile(null);
+    setFileName("");
+  } catch (error) {
+    console.log("ERROR FROM UPLOAD csv ::", error?.response?.data);
+
+    // 5) แยกเคส Error ให้ตรงสถานการณ์
+
+    // 5.1 กรณี Network / server ไม่ตอบเลย
+    if (!error.response) {
+      Swal.fire({
+        title: "ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้",
+        html: `
+          <p>ระบบไม่สามารถอัปโหลดไฟล์เข้าสู่เซิร์ฟเวอร์ได้</p>
           <hr/>
           <p class="text-start">
             <strong>วิธีแก้ปัญหา:</strong><br/>
-            - ตรวจสอบรูปแบบไฟล์ให้ถูกต้องและลองอัปโหลดใหม่อีกครั้ง<br/>
-            - หากข้อความด้านบนระบุสาเหตุเฉพาะ ให้แก้ไขตามคำแนะนำนั้น<br/>
-            - หากยังไม่สามารถอัปโหลดได้ กรุณาติดต่อผู้ดูแลระบบ
+            - ตรวจสอบการเชื่อมต่ออินเทอร์เน็ตของคุณ<br/>
+            - ลองกดรีเฟรชหน้าเว็บแล้วอัปโหลดใหม่อีกครั้ง<br/>
+            - หากยังไม่ได้ กรุณาแจ้งผู้ดูแลระบบตรวจสอบเซิร์ฟเวอร์
           </p>
         `,
         icon: "error",
         confirmButtonColor: "#dc3545",
       });
-    } finally {
-      setIsLoading(false);
+      return;
     }
-  };
+
+    const backendError = error.response.data || {};
+    const backendMessage = backendError.error || "";
+
+    // 5.2 ถ้า backend ส่ง Internal Server Error มา
+    // แต่เราอยากให้ user ได้ข้อความที่เข้าใจง่าย + วิธีแก้
+    if (backendMessage === "Internal Server Error") {
+      Swal.fire({
+        title: "เกิดข้อผิดพลาดระหว่างประมวลผลไฟล์",
+        html: `
+          <p>ระบบไม่สามารถประมวลผลไฟล์ที่อัปโหลดได้</p>
+          <hr/>
+          <p class="text-start">
+            <strong>วิธีแก้ปัญหา:</strong><br/>
+            - ตรวจสอบว่าไฟล์เป็นนามสกุล <b>.xlsx</b> ตามแบบฟอร์มที่ระบบกำหนด<br/>
+            - ตรวจสอบว่าไม่มีการลบหัวตาราง หรือแก้โครงสร้างคอลัมน์ผิดไปจากไฟล์ตัวอย่าง<br/>
+            - ลองแก้ไขไฟล์ให้ถูกต้องแล้วอัปโหลดใหม่อีกครั้ง<br/>
+            - หากยังมีปัญหา กรุณาติดต่อผู้ดูแลระบบเพื่อตรวจสอบรายละเอียดเพิ่มเติม
+          </p>
+        `,
+        icon: "error",
+        confirmButtonColor: "#dc3545",
+      });
+      return;
+    }
+
+    // 5.3 กรณีอื่น ๆ ใช้ข้อความจาก backend + วิธีแก้ทั่วไป
+    Swal.fire({
+      title: "ข้อผิดพลาดในการอัปโหลดไฟล์",
+      html: `
+        <p>${backendMessage || "การอัพโหลดไฟล์มีปัญหา"}</p>
+        <hr/>
+        <p class="text-start">
+          <strong>วิธีแก้ปัญหา:</strong><br/>
+          - ตรวจสอบรูปแบบไฟล์ให้ถูกต้องและลองอัปโหลดใหม่อีกครั้ง<br/>
+          - หากข้อความด้านบนระบุสาเหตุเฉพาะ ให้แก้ไขตามคำแนะนำนั้น<br/>
+          - หากยังไม่สามารถอัปโหลดได้ กรุณาติดต่อผู้ดูแลระบบ
+        </p>
+      `,
+      icon: "error",
+      confirmButtonColor: "#dc3545",
+    });
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   // -------------------------------------------------------------------
   // ฟังก์ชันลบข้อมูลที่เคย import

@@ -70,6 +70,7 @@ const SidebarMenu = () => {
                 { label: "รายงานสถิติการใช้กระดาษ", path: "/report", icon: <BarChart2 size={16} /> },
                 { label: "รายงานสถิติการส่งข้อสอบ", path: "/report-stats", icon: <BarChart2 size={16} /> },
                 { label: "รายงานการคุมสอบของกรรมการ", path: "/report-proctor", icon: <ClipboardCheck size={16} /> },
+                { label: "รายงานการใช้งานระบบ", path: "/report/activity-logs", icon: <ClipboardList size={16} /> },
             ],
         },
     };

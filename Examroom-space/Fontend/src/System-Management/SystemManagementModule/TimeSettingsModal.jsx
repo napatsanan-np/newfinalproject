@@ -58,23 +58,32 @@ const ExamConfig = () => {
   };
 
   const handleSelect = async (config) => {
-    if (window.confirm(`คุณต้องการเลือกใช้ข้อมูล ${config.academic_year} ${config.semester}`)) {
-      try {
-        await axios.post(localStorage.getItem("API") + '/selectConfig/exam_config', config , {
-          method: "POST",
+  if (window.confirm(`คุณต้องการเลือกใช้ข้อมูล ${config.academic_year} ${config.semester}`)) {
+    try {
+      await axios.post(
+        localStorage.getItem("API") + "/selectConfig/exam_config",
+        config,
+        {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
             "Content-Type": "application/json",
           },
-        });
-        fetchExamConfigs();
-        alert(`เลือกใช้ข้อมูล ${config.academic_year} ${config.semester}`);
-      } catch (error) {
-        console.error('Error deleting exam config:', error);
-        alert(`ไม่สามารถลบข้อมูลได้ ${config.academic_year} ${config.semester}`);
-      }
+        }
+      );
+
+      // สำคัญที่สุด: เก็บ id_config ลง localStorage
+      // เพื่อให้หน้า Import XLSX อ่านเจอ และไม่เด้งว่า "ยังไม่ได้ตั้งค่าระบบ"
+      localStorage.setItem("id_config", String(config.id));
+
+      fetchExamConfigs();
+      alert(`เลือกใช้ข้อมูล ${config.academic_year} ${config.semester} เรียบร้อยแล้ว`);
+    } catch (error) {
+      console.error("Error selecting exam config:", error);
+      alert(`ไม่สามารถเลือกใช้ข้อมูลได้ ${config.academic_year} ${config.semester}`);
     }
-  };
+  }
+};
+
 
   const handleEdit = (config) => {
     setCurrentConfig({

@@ -25,11 +25,12 @@ import Examstat from "./Report/Examstat.jsx";
 import ProctorReport from "./Report/ProctorReport.jsx";
 import HomeTeacher from "./Exam/SentForm/HomeTeacher.jsx";
 import AuthCallback from "../Auth.jsx";
+import ActivityLogs from "./Report/ActivityLogs.jsx";
 
 const isAuthenticated = () => !!localStorage.getItem("token");
 
 
-localStorage.setItem('API', "http://localhost:8080/api")  
+localStorage.setItem('API', "http://localhost:8080/api")
 window.User = JSON.parse(localStorage.getItem('user'));
 console.log(localStorage.getItem('API'));
 
@@ -61,7 +62,7 @@ const router = createBrowserRouter([
   {
     path: "/Dept/Deptmanagement",
     element: <Dept />,
-  }, 
+  },
   {
     path: "/Backup",
     element: <ProtectRoutes element={<Backup />} />,
@@ -113,7 +114,7 @@ const router = createBrowserRouter([
   },
   {
     path: "/auth/callback",
-    element: <AuthCallback/> ,
+    element: <AuthCallback />,
   },
   {
     path: "/report",
@@ -131,16 +132,20 @@ const router = createBrowserRouter([
     path: "/Home-Teacher",
     element: <ProtectRoutes element={<HomeTeacher />} />,
   },
+  {
+    path: "/report/activity-logs",
+    element: <ProtectRoutes element={<ActivityLogs />} />,
+  },
 ]);
 
 window.addEventListener("unload", () => {
   const token = localStorage.getItem("token");
-  
+
   if (token) {
     try {
       const decodedToken = JSON.parse(atob(token.split('.')[1]));
       const expiryTime = decodedToken.exp * 1000;
-      
+
       if (Date.now() > expiryTime) {
         localStorage.removeItem("token");
         window.location.reload();

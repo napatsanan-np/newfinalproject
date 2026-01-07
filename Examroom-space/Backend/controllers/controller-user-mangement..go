@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/models"
+	"github.com/services/selectservice"
 )
 
 // ============================
@@ -183,4 +185,31 @@ func (c *Controller) DelUser(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{"message": "ลบผู้ใช้เรียบร้อยแล้ว"})
+}
+
+func (ctrl *Controller) GetUserActivityLogs(c *gin.Context) {
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+
+	filter := selectservice.GetUserActivityLogsFilter{
+		Username: c.Query("username"),
+		Role:     c.Query("role"),
+		Action:   c.Query("action"),
+		Status:   c.Query("status"),
+		DateFrom: c.Query("date_from"),
+		DateTo:   c.Query("date_to"),
+		Limit:    limit,
+		Offset:   offset,
+	}
+
+	items, total, err := ctrl.SelectService.GetUserActivityLogs(filter)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"total": total,
+		"items": items,
+	})
 }

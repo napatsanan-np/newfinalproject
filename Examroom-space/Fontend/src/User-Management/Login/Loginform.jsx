@@ -37,6 +37,8 @@ function Loginform() {
         // Save token in localStorage
         localStorage.setItem('token', result.token);
         localStorage.setItem('user', JSON.stringify(result.user));
+        localStorage.setItem('roles', JSON.stringify(result.user.roles));
+
         window.User = JSON.parse(localStorage.getItem('user'));
         console.log("Data User:::", window.User);
         navigate('/Home'); // Navigate to Home on successful login

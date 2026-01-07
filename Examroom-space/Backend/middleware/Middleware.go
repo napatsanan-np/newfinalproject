@@ -41,10 +41,14 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// ✅ ดึงข้อมูลจาก claims และเก็บลง context
-		if userID, ok := claims["user_id"].(float64); ok {
-			c.Set("user_id", int(userID)) // JSON number เป็น float64
+		// ดึงข้อมูลจาก claims และเก็บลง context
+		// รองรับ user_id ทั้งแบบ string ("U001") และแบบตัวเลข
+		if uid, ok := claims["user_id"].(string); ok {
+			c.Set("user_id", uid)
+		} else if userID, ok := claims["user_id"].(float64); ok {
+			c.Set("user_id", int(userID))
 		}
+
 		if username, ok := claims["username"].(string); ok {
 			c.Set("username", username)
 		}

@@ -34,6 +34,7 @@ func SetupRoutes(r *gin.Engine, db *sql.DB) {
 	protected_teacher.Use(
 		middleware.AuthMiddleware(),
 		middleware.RoleMiddleware("อาจารย์"),
+		middleware.ActivityLogMiddleware(db),
 	)
 	{
 		protected_teacher.GET("/GetExamtable", examController.ExamDatawithRoleTeach)
@@ -45,6 +46,7 @@ func SetupRoutes(r *gin.Engine, db *sql.DB) {
 	protected_proctor.Use(
 		middleware.AuthMiddleware(),
 		middleware.RoleMiddleware("กรรมการคุมสอบ"),
+		middleware.ActivityLogMiddleware(db),
 	)
 	{
 		protected_proctor.GET("/GetExamtableProctor", examController.ExamDatawithRoleProctor)
@@ -56,6 +58,7 @@ func SetupRoutes(r *gin.Engine, db *sql.DB) {
 	protected.Use(
 		middleware.AuthMiddleware(),
 		middleware.RoleMiddleware("ผู้ดูแลระบบ", "กรรมการห้องข้อสอบ"),
+		middleware.ActivityLogMiddleware(db),
 	)
 	{
 		// protected.POST("/students/import", examController.StudentSig)
@@ -132,6 +135,7 @@ func SetupRoutes(r *gin.Engine, db *sql.DB) {
 
 
 		protected.POST("/admin/update/condition_proctor", examController.UpdateConditionProctorNew)
+		protected.GET("/activity-logs", examController.GetUserActivityLogs)
 
 	}
 }
