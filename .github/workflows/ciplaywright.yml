@@ -1,4 +1,4 @@
-name: CI Playwright
+name: CI Docker + Playwright
 
 on:
   push:
@@ -7,21 +7,21 @@ on:
     branches: ["main"]
 
 jobs:
-  playwright:
+  e2e:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # ไม่ต้อง cache เพื่อตัดปัญหาเดิมออกให้จบ
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 18
-          cache: npm
-          cache-dependency-path: Fontend/package-lock.json
 
-      - name: Install dependencies
+      # ติดตั้ง dependency สำหรับรัน Playwright (เฉพาะฝั่ง test)
+      - name: Install dependencies (Fontend)
         working-directory: Fontend
         run: npm ci
 
@@ -29,11 +29,14 @@ jobs:
         working-directory: Fontend
         run: npx playwright install --with-deps
 
-      - name: Start Frontend (Vite)
+      # สตาร์ทระบบเหมือนที่คุณรันจริง
+      - name: Build & Start Docker Compose
+        run: docker compose up -d --build
+
+      # รอให้หน้าเว็บขึ้น (ปรับ URL ตามพอร์ตจริงของคุณ)
+      - name: Wait for Frontend
         working-directory: Fontend
-        run: |
-          npm run dev -- --host 127.0.0.1 --port 3000 &
-          npx wait-on http://127.0.0.1:3000
+        run: npx wait-on http://127.0.0.1:3000
 
       - name: Run Playwright tests
         working-directory: Fontend
@@ -45,3 +48,12 @@ jobs:
         with:
           name: playwright-report
           path: Fontend/playwright-report/
+
+      # กัน resource ค้าง
+      - name: Docker logs (on failure)
+        if: failure()
+        run: docker compose logs --no-color
+
+      - name: Shutdown
+        if: always()
+        run: docker compose down
