@@ -40,9 +40,17 @@ jobs:
         working-directory: Examroom-space/Fontend
         run: npx playwright install --with-deps
 
-      - name: Build & Start Docker Compose
+      - name: Build backend Docker image
+        working-directory: Examroom-space/backend
+        run: docker build -t local/backend:fixed .
+
+      - name: Build frontend Docker image
+        working-directory: Examroom-space/Fontend
+        run: docker build -t local/frontend:fixed .   
+        
+      - name: start Docker Compose
         working-directory: Examroom-space
-        run: docker compose -f docker-compose.yml up -d --build
+        run: docker-compose up -d    
 
       - name: Wait for Frontend
         working-directory: Examroom-space/Fontend
