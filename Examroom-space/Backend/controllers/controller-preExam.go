@@ -111,12 +111,16 @@ func (c *Controller) CreateRoom(ctx *gin.Context) {
 		return
 	}
 
-	if err := c.Insertservice.InsertRoom(room); err != nil {
+	newRoomID, err := c.Insertservice.InsertRoomWithSeatPlan(ctx.Request.Context(), room)
+	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	ctx.JSON(http.StatusCreated, gin.H{"message": "Room created successfully"})
+	ctx.JSON(http.StatusCreated, gin.H{
+		"message": "Room created successfully",
+		"room_id": newRoomID,
+	})
 }
 
 // UpdateRoom handles updating an existing room
@@ -536,3 +540,4 @@ func (ctrl *Controller) GetRoomexamForEdit(c *gin.Context) {
 
 	c.JSON(http.StatusOK, data)
 }
+

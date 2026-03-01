@@ -6,8 +6,6 @@ import axios from "axios";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 
-/* อนุญาตเฉพาะ R001–R005 */
-const ALLOWED_ROOMS = new Set(["R001","R002","R003","R004","R005"]);
 
 /* ================= helpers (เดิม) ================= */
 const getIdConfig = (d) =>
@@ -94,7 +92,6 @@ export function ExcelImportModal({ show, handleClose, onImportSuccess, datas }) 
 
   /* ======= เตรียมค่าพื้นฐาน + ตรวจห้อง ======= */
   const roomIdValue = getRoomId(datas);
-  const isAllowed = roomIdValue ? ALLOWED_ROOMS.has(String(roomIdValue).toUpperCase()) : false;
 
   /* ===================== Export cover Excel ===================== */
   const handleExportExcel = () => {
@@ -130,28 +127,27 @@ export function ExcelImportModal({ show, handleClose, onImportSuccess, datas }) 
   };
 
   /* ===================== Import Excel -> GET รายชื่อ ===================== */
+  /* ===================== Import Excel -> GET รายชื่อ ===================== */
   const handleImport = async () => {
     if (!file) { setError("กรุณาเลือกไฟล์ Excel"); return; }
-    if (!isAllowed) { setError("หน้านี้รองรับเฉพาะห้อง R001–R005 เท่านั้น"); return; }
 
-    let idConfigValue = getIdConfig(datas);
-    const courseValue  = (selectedCourse || getCourseStrict(datas) || "").trim();
+    const roomId = roomIdValue; // ✅ ใช้ตัวจริง
+    if (!roomId) { setError("ไม่พบ room_id ในข้อมูลห้อง"); return; }
+
+    let idConfigValue = getIdConfig(datas); // ✅ optional
+    const courseValue = (selectedCourse || getCourseStrict(datas) || "").trim();
 
     if (!idConfigValue) {
       const fromLocal = getIdConfigFromLocal();
       if (fromLocal > 0) idConfigValue = fromLocal;
     }
-    if (!idConfigValue || !roomIdValue) {
-      setError(`ไม่พบ id_config/room_id ในข้อมูลห้อง (id_config=${idConfigValue ?? "null"}, room_id=${roomIdValue ?? "null"})`);
-      return;
-    }
+    // ตอนนี้ idConfigValue อาจเป็น null/0 ได้ (โอเค)
 
     setLoading(true); setError(null); setUploadProgress(0);
 
     const fetchStudents = async (withCourse) => {
       const params = new URLSearchParams({
-        id_config: String(idConfigValue),
-        room_id: String(roomIdValue),
+        room_id: String(roomId),
         mode: (() => {
           if (selectedRow === 2) return "even";
           if (selectedRow === 3) return "odd";
@@ -159,6 +155,10 @@ export function ExcelImportModal({ show, handleClose, onImportSuccess, datas }) 
           return "all";
         })(),
       });
+
+      // ✅ ส่ง id_config เฉพาะตอนมีค่า (วิธี A)
+      if (idConfigValue) params.set("id_config", String(idConfigValue));
+
       if (selectedRow === 4 && customRow) params.set("custom", customRow);
       if (withCourse && courseValue) params.set("course", courseValue);
 
@@ -173,8 +173,11 @@ export function ExcelImportModal({ show, handleClose, onImportSuccess, datas }) 
     try {
       const fd = new FormData();
       fd.append("file", file);
-      fd.append("id_config", String(idConfigValue));
-      fd.append("room_id", String(roomIdValue));
+      fd.append("room_id", String(roomId));
+
+      // ✅ ส่ง id_config เฉพาะตอนมีค่า (วิธี A)
+      if (idConfigValue) fd.append("id_config", String(idConfigValue));
+
       if (courseValue) fd.append("course", courseValue);
 
       await axios.post(`${localStorage.getItem("API")}/students/import`, fd, {
@@ -195,17 +198,17 @@ export function ExcelImportModal({ show, handleClose, onImportSuccess, datas }) 
     try {
       let data = await fetchStudents(true);
       if (!data?.students?.length) {
-        console.warn("[students] empty with course filter, retry without course");
         data = await fetchStudents(false);
       }
 
       const mapped = (data?.students || []).map((s, i) => ({
         IdStd: s.student_id || "",
         Name: s.student_name || "",
-        Dep:  s.dep || "",
+        Dep: s.dep || "",
         Seat: s.seat_no || "",
         _idx: i + 1,
       }));
+
       setDataSig(mapped);
       setDataSigGroup(Array.isArray(data?.grouped) ? data.grouped : []);
 
@@ -222,6 +225,7 @@ export function ExcelImportModal({ show, handleClose, onImportSuccess, datas }) 
       setLoading(false); setUploadProgress(0);
     }
   };
+
 
   /* ===================== ส่วนพิมพ์ ===================== */
   const PrintComponent = React.forwardRef((props, ref) => {
@@ -305,7 +309,7 @@ export function ExcelImportModal({ show, handleClose, onImportSuccess, datas }) 
         <h1 style={{ fontSize: "26pt", color: datas?.roomexam?.Etime && parseInt(datas.roomexam.Etime.split(":")[0], 10) >= 13 ? "red" : "blue" }}>
           {datas?.roomexam?.Etime && (parseInt(datas.roomexam.Etime.split(":")[0], 10) >= 13 ? "สอบบ่าย" : "สอบเช้า")}
         </h1>
-        <h1 style={{ fontSize: "26pt" }}>รายวิชา {selectedCourse || (datas?.roomexam?.Course || "No data")}<br/></h1>
+        <h1 style={{ fontSize: "26pt" }}>รายวิชา {selectedCourse || (datas?.roomexam?.Course || "No data")}<br /></h1>
         <h3 style={{ fontSize: "24pt" }}>สอบวันที่ {datas?.roomexam?.Edate || "No data"} เวลา {datas?.roomexam?.Etime || "No data"}</h3>
         <h3 style={{ fontSize: "22pt" }}>ห้องสอบ {datas?.rooms?.room_name || "No data"}</h3>
 
@@ -351,13 +355,6 @@ export function ExcelImportModal({ show, handleClose, onImportSuccess, datas }) 
       <Modal show={show} onHide={resetForm} backdrop="static" size="lg">
         <Modal.Header closeButton><Modal.Title>นำเข้าข้อมูลนักศึกษาจากไฟล์ Excel</Modal.Title></Modal.Header>
         <Modal.Body>
-          {/* แจ้งเตือนกรณีไม่ใช่ห้อง R001–R005 */}
-          {!isAllowed && (
-            <Alert variant="warning" className="mb-3">
-              หน้านี้รองรับเฉพาะห้อง R001–R005 เท่านั้น (ห้องปัจจุบัน: {roomIdValue || "-"})
-            </Alert>
-          )}
-
           {/* ซ่อน dropdown วิชา เมื่อมีเพียง 1 วิชา */}
           {courseOptions.length > 1 && (
             <Form.Group className="mb-3">
@@ -420,14 +417,12 @@ export function ExcelImportModal({ show, handleClose, onImportSuccess, datas }) 
             disabled={
               !file ||
               loading ||
-              !isAllowed ||           // ✅ อนุญาตเฉพาะ R001–R005
               (courseOptions.length > 1 && !selectedCourse) ||
               (selectedRow === 4 && !customRow)
             }
           >
             {loading ? <> <Spinner as="span" animation="border" size="sm" className="me-2" /> กำลังนำเข้า... </> : "นำเข้าข้อมูล"}
           </Button>
-          {dataSigGroup?.length > 0 && <Button variant="outline-success" onClick={handleExportExcel} disabled={loading}>ส่งออก Cover Excel</Button>}
         </Modal.Footer>
       </Modal>
 

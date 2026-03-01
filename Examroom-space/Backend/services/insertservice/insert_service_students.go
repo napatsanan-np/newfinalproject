@@ -4,6 +4,7 @@ package insertservice
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"strings"
 
 	"github.com/models"
@@ -22,8 +23,39 @@ type Meta struct {
 	RoomID   string
 }
 
+// เช็คว่า room_id นี้อยู่ใน config นี้จริง (กัน import ผิดช่วงสอบ)
+func (s *UseInsertService) validateRoomInConfig(ctx context.Context, idConfig int, roomID string) error {
+	var ok int
+	err := s.DB.QueryRowContext(ctx, `
+		SELECT 1
+		FROM public.roomexam
+		WHERE id_config = $1 AND room_id = $2
+		LIMIT 1
+	`, idConfig, roomID).Scan(&ok)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return fmt.Errorf("room_id=%s ไม่อยู่ใน id_config=%d (อาจเลือกห้องคนละช่วงสอบ)", roomID, idConfig)
+		}
+		return err
+	}
+	return nil
+}
+
 // ReplaceExamStudents: ลบของเก่าแล้ว insert ใหม่ แยกตาม course
 func (s *UseInsertService) ReplaceExamStudents(ctx context.Context, meta Meta, rows []StudentRow) error {
+
+	// ✅ Step 3 (ใส่ตรงนี้เลย): validate room_id อยู่ใน id_config จริงก่อนทำลบ/insert
+	if meta.IDConfig == 0 {
+		return fmt.Errorf("id_config ว่าง/เป็น 0")
+	}
+	if strings.TrimSpace(meta.RoomID) == "" {
+		return fmt.Errorf("room_id ว่าง")
+	}
+	if err := s.validateRoomInConfig(ctx, meta.IDConfig, meta.RoomID); err != nil {
+		return err
+	}
+
 	tx, err := s.DB.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
 		return err
@@ -129,7 +161,7 @@ func (s *UseInsertService) scanRows(ctx context.Context, query string, args ...a
 }
 
 func (s *UseInsertService) ListDetailExamForEdit(ctx context.Context) ([]models.ExamDetail, error) {
-    const q = `
+	const q = `
         SELECT 
             ref,
             COALESCE(submit, '')        AS submit,
@@ -157,55 +189,54 @@ func (s *UseInsertService) ListDetailExamForEdit(ctx context.Context) ([]models.
         ORDER BY id_config ASC, ref ASC;
     `
 
-    rows, err := s.DB.QueryContext(ctx, q)
-    if err != nil {
-        return nil, err
-    }
-    defer rows.Close()
+	rows, err := s.DB.QueryContext(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 
-    var result []models.ExamDetail
+	var result []models.ExamDetail
 
-    for rows.Next() {
-        var r models.ExamDetail
-        var filesStr string // ตอนนี้ยังเก็บเป็น string เฉย ๆ ก่อน
+	for rows.Next() {
+		var r models.ExamDetail
+		var filesStr string // ตอนนี้ยังเก็บเป็น string เฉย ๆ ก่อน
 
-        if err := rows.Scan(
-            &r.Ref,
-            &r.Submit,
-            &r.SubDate,
-            &r.Copy,
-            &r.Page,
-            &r.Recive,
-            &r.RecDate,
-            &r.Qty,
-            &r.StapleConner,
-            &r.StapleApart,
-            &r.Calculator,
-            &r.AnswerSheet,
-            &r.AnswerBookUse,
-            &r.Remark,
-            &r.Color,
-            &r.Lecturer,
-            &r.No_st,
-            &filesStr,
-            &r.ExamType,
-        ); err != nil {
-            return nil, err
-        }
+		if err := rows.Scan(
+			&r.Ref,
+			&r.Submit,
+			&r.SubDate,
+			&r.Copy,
+			&r.Page,
+			&r.Recive,
+			&r.RecDate,
+			&r.Qty,
+			&r.StapleConner,
+			&r.StapleApart,
+			&r.Calculator,
+			&r.AnswerSheet,
+			&r.AnswerBookUse,
+			&r.Remark,
+			&r.Color,
+			&r.Lecturer,
+			&r.No_st,
+			&filesStr,
+			&r.ExamType,
+		); err != nil {
+			return nil, err
+		}
 
-        // ถ้ายังไม่อยาก parse string -> []string ก็ปล่อยว่างไว้ก่อนให้เป็น nil
-        // r.FileExam = parseFiles(filesStr) // ไว้อนาคตค่อยทำถ้าจำเป็น
+		// ถ้ายังไม่อยาก parse string -> []string ก็ปล่อยว่างไว้ก่อนให้เป็น nil
+		// r.FileExam = parseFiles(filesStr) // ไว้อนาคตค่อยทำถ้าจำเป็น
 
-        result = append(result, r)
-    }
+		result = append(result, r)
+	}
 
-    if err := rows.Err(); err != nil {
-        return nil, err
-    }
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 
-    return result, nil
+	return result, nil
 }
-
 
 // ========= ใช้สำหรับหน้าแก้ไขข้อมูลตารางสอบ (examtable) =========
 type ExamtableEditRow struct {
@@ -270,7 +301,7 @@ type RoomexamEditRow struct {
 	Course    string `json:"Course"`
 	Lecturer  string `json:"Lecturer"`
 	RoomID    string `json:"Room_id"`
-	Seatrow   string `json:"Seatrow"` 
+	Seatrow   string `json:"Seatrow"`
 	TypeExam  string `json:"Type_exam"`
 	GroupExam string `json:"Group_exam"`
 	NumSt     string `json:"Num_st"`

@@ -1,6 +1,17 @@
 // Label-STUDENT.jsx
 import React, { useState, useEffect } from "react";
-import { Container, Row, Col, Card, Button, Spinner, Alert, Collapse, Toast, ToastContainer } from "react-bootstrap";
+import {
+  Container,
+  Row,
+  Col,
+  Card,
+  Button,
+  Spinner,
+  Alert,
+  Collapse,
+  Toast,
+  ToastContainer,
+} from "react-bootstrap";
 import { ExcelImportModal } from "./ExcelImportModal";
 
 export default function StudentSig() {
@@ -15,6 +26,16 @@ export default function StudentSig() {
   const [toastMessage, setToastMessage] = useState("");
   const [toastVariant, setToastVariant] = useState("success");
 
+  // ✅ helper: ตรวจว่าเป็น "ห้องบรรยาย(สโลป)" ไหม
+  const isSlopeRoom = (roomType) => {
+    const rt = String(roomType || "").trim();
+    // แบบยืดหยุ่น: ขอมีคำว่า "สโลป" ก็ผ่าน
+    return rt.includes("สโลป");
+
+    // ถ้าต้องการตรงเป๊ะ 100% ใช้แบบนี้แทน:
+    // return rt === "ห้องบรรยาย(สโลป)";
+  };
+
   useEffect(() => {
     (async () => {
       try {
@@ -25,20 +46,32 @@ export default function StudentSig() {
         if (!res.ok) throw new Error("Network response was not ok");
         const dataRoom = await res.json();
 
+        // ✅ กรองเฉพาะรายการที่มี room_id และเป็นห้องบรรยาย(สโลป) เท่านั้น
+        const onlySlope = (Array.isArray(dataRoom) ? dataRoom : []).filter(
+          (it) =>
+            it?.rooms?.room_id &&
+            isSlopeRoom(it?.rooms?.room_type)
+        );
+
         // รวมรายการที่มี Ref+room_id เดียวกัน (คง logic เดิม)
-        const filtered = (Array.isArray(dataRoom) ? dataRoom : []).filter((it) => it?.rooms?.room_id);
-        const groups = [], map = {};
-        filtered.forEach((it) => {
+        const groups = [];
+        const map = {};
+        onlySlope.forEach((it) => {
           if (!it.roomexam || !it.rooms) return;
           const key = `${it.roomexam.Ref}-${it.rooms.room_id}`;
           if (!map[key]) {
-            map[key] = { ...it, combinedItems: [it], totalStudents: parseInt(it.roomexam.Num_st) || 0 };
+            map[key] = {
+              ...it,
+              combinedItems: [it],
+              totalStudents: parseInt(it.roomexam.Num_st) || 0,
+            };
             groups.push(map[key]);
           } else {
             map[key].combinedItems.push(it);
-            map[key].totalStudents += (parseInt(it.roomexam.Num_st) || 0);
+            map[key].totalStudents += parseInt(it.roomexam.Num_st) || 0;
           }
         });
+
         setData(groups);
       } catch (e) {
         setError("Failed to fetch data. Please try again later.");
@@ -49,12 +82,16 @@ export default function StudentSig() {
   }, []);
 
   const toggleItem = (i) => setOpenItems((prev) => ({ ...prev, [i]: !prev[i] }));
-  const openModal = (roomData) => { setSelectedRoomData(roomData); setShowImportModal(true); };
+  const openModal = (roomData) => {
+    setSelectedRoomData(roomData);
+    setShowImportModal(true);
+  };
   const closeModal = () => setShowImportModal(false);
 
   // Toast: แสดงจำนวนรายการที่นำเข้าสำเร็จ (คงเดิม)
   const handleImportSuccess = (resp) => {
-    const count = typeof resp?.count === "number" ? resp.count : (resp?.students?.length || 0);
+    const count =
+      typeof resp?.count === "number" ? resp.count : resp?.students?.length || 0;
     setToastVariant("success");
     setToastMessage(`นำเข้าข้อมูลสำเร็จ (${count} รายการ)`);
     setShowToast(true);
@@ -68,6 +105,7 @@ export default function StudentSig() {
       </Container>
     );
   }
+
   if (error) {
     return (
       <Container className="mt-4">
@@ -75,12 +113,13 @@ export default function StudentSig() {
       </Container>
     );
   }
+
   if (!data?.length) {
     return (
       <Container className="mt-4">
         <Alert variant="info" className="text-center">
           <Alert.Heading>ยังไม่มีข้อมูล</Alert.Heading>
-          <p>ไม่พบข้อมูลห้องสอบที่ตรงตามเงื่อนไข</p>
+          <p>ไม่พบข้อมูลห้องสอบที่ตรงตามเงื่อนไข (เฉพาะห้องบรรยาย(สโลป))</p>
         </Alert>
       </Container>
     );
@@ -89,9 +128,19 @@ export default function StudentSig() {
   return (
     <Container className="py-4">
       <ToastContainer position="top-end" className="p-3">
-        <Toast show={showToast} onClose={() => setShowToast(false)} delay={3000} autohide bg={toastVariant}>
-          <Toast.Header><strong className="me-auto">แจ้งเตือน</strong></Toast.Header>
-          <Toast.Body className={toastVariant === "success" ? "text-white" : ""}>{toastMessage}</Toast.Body>
+        <Toast
+          show={showToast}
+          onClose={() => setShowToast(false)}
+          delay={3000}
+          autohide
+          bg={toastVariant}
+        >
+          <Toast.Header>
+            <strong className="me-auto">แจ้งเตือน</strong>
+          </Toast.Header>
+          <Toast.Body className={toastVariant === "success" ? "text-white" : ""}>
+            {toastMessage}
+          </Toast.Body>
         </Toast>
       </ToastContainer>
 
@@ -113,7 +162,6 @@ export default function StudentSig() {
               <div className="d-flex justify-content-between align-items-center">
                 <div>
                   <div className="d-flex align-items-center">
-                    {/* เอา Badge "มีรายการซ้ำ ..." ออกแล้ว ให้เหลือชื่อวิชาเหมือนเดิม */}
                     <h2 className="fs-4 fw-bold mb-0">{item.roomexam.Course}</h2>
                   </div>
                   <Row className="mt-2">
@@ -193,12 +241,18 @@ export default function StudentSig() {
                       <div className="d-flex align-items-center">
                         {totalStudents <= roomCapacity ? (
                           <>
-                            <span className="d-inline-block rounded-circle bg-success me-2" style={{ width: 12, height: 12 }}></span>
+                            <span
+                              className="d-inline-block rounded-circle bg-success me-2"
+                              style={{ width: 12, height: 12 }}
+                            ></span>
                             <span>ใช้งานได้ ({totalStudents}/{roomCapacity} ที่นั่ง)</span>
                           </>
                         ) : (
                           <>
-                            <span className="d-inline-block rounded-circle bg-danger me-2" style={{ width: 12, height: 12 }}></span>
+                            <span
+                              className="d-inline-block rounded-circle bg-danger me-2"
+                              style={{ width: 12, height: 12 }}
+                            ></span>
                             <span>เกินความจุ ({totalStudents}/{roomCapacity} ที่นั่ง)</span>
                           </>
                         )}
@@ -230,5 +284,5 @@ export default function StudentSig() {
         datas={selectedRoomData}
       />
     </Container>
-  );
+  ); 
 }

@@ -5,6 +5,10 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"context"
+	"database/sql"
+	"encoding/json"
+	"strings"
 
 	"github.com/models"
 )
@@ -155,4 +159,71 @@ func (s *UseInsertService) AddDepartment(department models.Departments) error {
 
 	log.Printf("เพิ่มภาควิชาใหม่เรียบร้อยแล้ว (id_dept = %d)\n", newID)
 	return nil
+}
+
+
+func (s *UseInsertService) InsertRoomWithSeatPlan(ctx context.Context, room models.Room) (string, error) {
+	tx, err := s.DB.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	// 1) gen room_id ใหม่
+	var maxID string
+	_ = tx.QueryRowContext(ctx,
+		"SELECT room_id FROM rooms WHERE room_id LIKE 'R%' ORDER BY room_id DESC LIMIT 1",
+	).Scan(&maxID)
+
+	newID := "R001"
+	if strings.TrimSpace(maxID) != "" {
+		numPart := strings.TrimPrefix(maxID, "R")
+		if n, e := strconv.Atoi(numPart); e == nil {
+			n++
+			newID = fmt.Sprintf("R%03d", n)
+		}
+	}
+
+	// 2) insert rooms
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO rooms (room_id, room_name, capacity, room_type)
+		VALUES ($1,$2,$3,$4)
+	`, newID, room.RoomName, room.Capacity, room.RoomType)
+	if err != nil {
+		return "", err
+	}
+
+	// 3) ถ้าเป็น “ห้องบรรยาย(สโลป)” และมี seat_plan -> insert room_seat_plan
+	if room.RoomType == "ห้องบรรยาย(สโลป)" && room.SeatPlan != nil {
+		oddJSON, e := json.Marshal(room.SeatPlan.OddPattern)
+		if e != nil {
+			return "", e
+		}
+		evenJSON, e := json.Marshal(room.SeatPlan.EvenPattern)
+		if e != nil {
+			return "", e
+		}
+
+		extra := room.SeatPlan.ExtraRowSize
+		if extra <= 0 {
+			extra = 10 // ค่า default แบบที่คุณใส่ไว้ใน table ตอนนี้
+		}
+
+		_, err = tx.ExecContext(ctx, `
+			INSERT INTO room_seat_plan (room_id, odd_pattern, even_pattern, extra_row_size, updated_at)
+			VALUES ($1, $2::jsonb, $3::jsonb, $4, NOW())
+		`, newID, string(oddJSON), string(evenJSON), extra)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	if err = tx.Commit(); err != nil {
+		return "", err
+	}
+	return newID, nil
 }

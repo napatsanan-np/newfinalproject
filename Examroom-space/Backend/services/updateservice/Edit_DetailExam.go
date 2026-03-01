@@ -154,7 +154,6 @@ func (s *Userupdateservice) Update_ExamConfigByYearSemester(data models.ExamConf
 	// Return nil if the operation was successful
 	return nil
 }
-
 func (s *Userupdateservice) Update_ExamConfigByStatus(data models.ExamConfig) error {
 	// ตั้งค่าทุกแถวให้ status = false ก่อน
 	query := `UPDATE public.exam_config SET status = $1;`
@@ -164,17 +163,29 @@ func (s *Userupdateservice) Update_ExamConfigByStatus(data models.ExamConfig) er
 		return err
 	}
 
-	// ตั้งค่า status = true เฉพาะแถวที่ตรงกับ academic_year และ semester
-	query1 := `UPDATE public.exam_config SET status = $1 WHERE academic_year = $2 AND semester = $3;`
-	_, err = s.DB.Exec(query1, true, data.AcademicYear, data.Semester)
+	// 2) set true เฉพาะ ปี + ภาค + phase ที่เลือก
+	query1 := `
+		UPDATE public.exam_config
+		SET status = $1
+		WHERE academic_year = $2
+		  AND semester = $3
+		  AND phase = $4;
+	`
+	_, err = s.DB.Exec(
+		query1,
+		true,
+		data.AcademicYear,
+		data.Semester,
+		data.Phase,
+	)
 	if err != nil {
 		log.Println("Error executing update query:", err)
 		return err
 	}
 
-	// สำเร็จ ไม่มี error
 	return nil
 }
+
 
 func (s *Userupdateservice) CheckUser(proctor string) string {
 	// Split the input string into parts

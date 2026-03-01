@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import Select from "react-select";
 import { Container, Button, Table, Nav, Card } from "react-bootstrap";
 import SidebarMenu from "../../Navbar/SidebarMenu.jsx";
+
 /** สรุปสถานะการส่งข้อสอบจาก item ที่ join มา */
 function getSubmitStatus(item) {
   // กรณีไม่มีแถวใน detail_exam เลย → ถือว่า “ไม่มีข้อสอบ”
@@ -15,7 +16,6 @@ function getSubmitStatus(item) {
 }
 
 const Search = () => {
-  const url = window.API_URL;
   const token = localStorage.getItem("token");
 
   const [activeTab, setActiveTab] = useState("course");
@@ -36,9 +36,12 @@ const Search = () => {
           }
         );
         const dataDetail = await response.json();
+
         if (Array.isArray(dataDetail) && dataDetail.length > 0) {
           setRoomData(dataDetail);
+          setError(null);
         } else {
+          setRoomData([]);
           setError("ไม่พบข้อมูลห้องสอบ");
         }
       } catch (error) {
@@ -46,11 +49,12 @@ const Search = () => {
         setError("เกิดข้อผิดพลาดในการดึงข้อมูล กรุณาลองใหม่อีกครั้ง");
       }
     }
+
     read_data_ExamRoom();
-  }, [token, url]);
+  }, [token]);
 
   const handleSearch = (results) => {
-    setSearchResults(results);
+    setSearchResults(Array.isArray(results) ? results : []);
     setShowTable(true);
   };
 
@@ -140,6 +144,7 @@ const Search = () => {
                 </Nav.Item>
               </Nav>
             </Card.Header>
+
             <Card.Body>
               {error ? (
                 <p className="text-danger">{error}</p>
@@ -164,31 +169,35 @@ const Search = () => {
   );
 };
 
+/* ================= TAB: ค้นหาด้วยวิชา ================= */
+
 const CourseSearch = ({ data, onSearch, onReset }) => {
   const [selectedCourse, setSelectedCourse] = useState(null);
 
   const handleSearch = () => {
-    if (selectedCourse) {
-      const filtered = data.filter(
-        (item) => item.roomexam.Ref === selectedCourse.roomexam.Ref
-      );
-      onSearch(filtered);
-    }
+    if (!selectedCourse) return;
+
+    const filtered = data.filter(
+      (item) => item?.roomexam?.Ref === selectedCourse?.roomexam?.Ref
+    );
+    onSearch(filtered);
   };
 
   return (
     <>
       <h3 className="mt-4 mb-3">ค้นหาด้วยวิชา</h3>
+
       <Select
         options={data.map((item) => ({
-          label: item.roomexam.Course || "ไม่ระบุ",
-          value: item.roomexam.Course,
+          label: item?.roomexam?.Course || "ไม่ระบุ",
+          value: item?.roomexam?.Course,
           ...item,
         }))}
         onChange={setSelectedCourse}
         value={selectedCourse}
         noOptionsMessage={() => "ไม่พบข้อมูลวิชา"}
       />
+
       <div className="mt-3 d-flex">
         <Button
           onClick={handleSearch}
@@ -205,35 +214,41 @@ const CourseSearch = ({ data, onSearch, onReset }) => {
   );
 };
 
+/* ================= TAB: ค้นหาด้วยวันที่ ================= */
+
 const DateSearch = ({ data, onSearch, onReset }) => {
   const [selectedDate, setSelectedDate] = useState(null);
 
   const handleSearch = () => {
-    if (selectedDate) {
-      const filtered = data.filter(
-        (item) => item.roomexam.Edate === selectedDate.value
-      );
-      onSearch(filtered);
-    }
+    if (!selectedDate) return;
+
+    const filtered = data.filter(
+      (item) => item?.roomexam?.Edate === selectedDate.value
+    );
+    onSearch(filtered);
   };
 
   const getUniqueDates = (data) => {
-    const uniqueDates = [...new Set(data.map((item) => item.roomexam.Edate))];
-    return uniqueDates.map((date) => ({
-      label: date || "ไม่ระบุ",
-      value: date,
-    }));
+    const uniqueDates = [...new Set(data.map((item) => item?.roomexam?.Edate))];
+    return uniqueDates
+      .filter(Boolean)
+      .map((date) => ({
+        label: date,
+        value: date,
+      }));
   };
 
   return (
     <>
       <h3 className="mt-4 mb-3">ค้นหาด้วยวันที่</h3>
+
       <Select
         options={getUniqueDates(data)}
         onChange={setSelectedDate}
         value={selectedDate}
         noOptionsMessage={() => "ไม่พบข้อมูลวันที่"}
       />
+
       <div className="mt-3 d-flex">
         <Button
           onClick={handleSearch}
@@ -250,35 +265,41 @@ const DateSearch = ({ data, onSearch, onReset }) => {
   );
 };
 
+/* ================= TAB: ค้นหาด้วยห้องสอบ ================= */
+
 const RoomSearch = ({ data, onSearch, onReset }) => {
   const [selectedRoom, setSelectedRoom] = useState(null);
 
   const handleSearch = () => {
-    if (selectedRoom) {
-      const filtered = data.filter(
-        (item) => item.rooms.room_name === selectedRoom.value
-      );
-      onSearch(filtered);
-    }
+    if (!selectedRoom) return;
+
+    const filtered = data.filter(
+      (item) => item?.rooms?.room_name === selectedRoom.value
+    );
+    onSearch(filtered);
   };
 
   const getUniqueRooms = (data) => {
-    const uniqueRooms = [...new Set(data.map((item) => item.rooms.room_name))];
-    return uniqueRooms.map((room) => ({
-      label: room || "ไม่ระบุ",
-      value: room,
-    }));
+    const uniqueRooms = [...new Set(data.map((item) => item?.rooms?.room_name))];
+    return uniqueRooms
+      .filter(Boolean)
+      .map((room) => ({
+        label: room,
+        value: room,
+      }));
   };
 
   return (
     <>
       <h3 className="mt-4 mb-3">ค้นหาด้วยห้องสอบ</h3>
+
       <Select
         options={getUniqueRooms(data)}
         onChange={setSelectedRoom}
         value={selectedRoom}
         noOptionsMessage={() => "ไม่พบข้อมูลห้องสอบ"}
       />
+
       <div className="mt-3 d-flex">
         <Button
           onClick={handleSearch}
@@ -295,33 +316,37 @@ const RoomSearch = ({ data, onSearch, onReset }) => {
   );
 };
 
+/* ================= TAB: ค้นหาด้วยสถานะการส่งข้อสอบ ================= */
+
 const SubmitSearch = ({ data, onSearch, onReset }) => {
   const [selectedSubmit, setSelectedSubmit] = useState(null);
 
   const handleSearch = () => {
-    if (selectedSubmit !== null) {
-      const filtered = data.filter((item) => {
-        const status = getSubmitStatus(item);
-        return status === selectedSubmit.value;
-      });
-      onSearch(filtered);
-    }
+    if (selectedSubmit === null) return;
+
+    const filtered = data.filter((item) => {
+      const status = getSubmitStatus(item);
+      return status === selectedSubmit.value;
+    });
+    onSearch(filtered);
   };
 
   return (
     <>
       <h3 className="mt-4 mb-3">ค้นหาด้วยสถานะการส่งข้อสอบ</h3>
+
       <Select
         options={[
           { label: "ส่งแล้ว", value: "ส่งแล้ว" },
           { label: "รอการยืนยัน", value: "รอการยืนยัน" },
           { label: "ยังไม่ส่ง", value: "ยังไม่ส่ง" },
-          { label: "มีสอบแต่ไม่มีข้อสอบ", value: "ไม่มีข้อสอบ" }, // ✅ เพิ่มตัวเลือกนี้
+          { label: "มีสอบแต่ไม่มีข้อสอบ", value: "ไม่มีข้อสอบ" },
         ]}
         onChange={setSelectedSubmit}
         value={selectedSubmit}
         noOptionsMessage={() => "ไม่พบข้อมูลสถานะการส่งข้อสอบ"}
       />
+
       <div className="mt-3 d-flex">
         <Button
           onClick={handleSearch}
@@ -338,6 +363,8 @@ const SubmitSearch = ({ data, onSearch, onReset }) => {
   );
 };
 
+/* ================= TABLE: ผลลัพธ์การค้นหา ================= */
+
 const SearchResultsTable = ({ results }) => (
   <div className="exam-search">
     <Table striped bordered hover>
@@ -350,24 +377,25 @@ const SearchResultsTable = ({ results }) => (
           <th>เวลาสอบ</th>
           <th>จำนวนชั่วโมง</th>
           <th>จำนวนนักศึกษา</th>
-          <th>อาจาร์ยผู้สอน</th>
+          <th>อาจารย์ผู้สอน</th>
           <th>สถานะการส่งข้อสอบ</th>
         </tr>
       </thead>
+
       <tbody>
         {results.length > 0 ? (
-          results.map((item) => {
+          results.map((item, index) => {
             const status = getSubmitStatus(item);
             return (
-              <tr key={item.roomexam.No}>
-                <td>{item.roomexam.No}</td>
-                <td>{item.roomexam.Course}</td>
-                <td>{item.rooms.room_name}</td>
-                <td>{item.roomexam.Edate}</td>
-                <td style={{ width: "130px" }}>{item.roomexam.Etime}</td>
-                <td>{item.roomexam.Hr}</td>
-                <td>{item.roomexam.Num_st}</td>
-                <td>{item.roomexam.Lecturer}</td>
+              <tr key={`${item?.roomexam?.Ref || "ref"}-${index}`}>
+                <td>{index + 1}</td>
+                <td>{item?.roomexam?.Course}</td>
+                <td>{item?.rooms?.room_name}</td>
+                <td>{item?.roomexam?.Edate}</td>
+                <td style={{ width: "130px" }}>{item?.roomexam?.Etime}</td>
+                <td>{item?.roomexam?.Hr}</td>
+                <td>{item?.roomexam?.Num_st}</td>
+                <td>{item?.roomexam?.Lecturer}</td>
                 <td>{status}</td>
               </tr>
             );

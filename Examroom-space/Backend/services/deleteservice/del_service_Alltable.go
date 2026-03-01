@@ -72,24 +72,34 @@ func (s *UserDeleteService) Deltables(ref string) {
 }
 
 func (s *UserDeleteService) Delete_ExamConfigByYearSemester(data models.ExamConfig) error {
-	// คำสั่ง DELETE เพื่อลบข้อมูลตาม academic_year และ semester
+	// 1) ลบข้อมูล "เฉพาะ" ปี + ภาค + phase ที่เลือก
 	query := `
 		DELETE FROM public.exam_config
-		WHERE academic_year = $1 AND semester = $2
+		WHERE academic_year = $1
+		  AND semester = $2
+		  AND phase = $3
 	`
-	_, err := s.DB.Exec(query, data.AcademicYear, data.Semester)
+	_, err := s.DB.Exec(query, data.AcademicYear, data.Semester, data.Phase)
 	if err != nil {
 		log.Println("Error executing DELETE query:", err)
 		return err
 	}
 
-	// อัปเดต status ของเรคอร์ดล่าสุดที่เหลืออยู่
+	// 2) ตั้ง status ให้แถวล่าสุด "ของปี/ภาคเดียวกัน" (ถ้ายังเหลือ) เป็น TRUE
+	// (กันไม่ให้ไปไป active ข้ามปี/ภาค)
 	updateQuery := `
-		UPDATE public.exam_config 
-		SET status = TRUE 
-		WHERE id_config = (SELECT id_config FROM public.exam_config ORDER BY id_config DESC LIMIT 1)
+		UPDATE public.exam_config
+		SET status = TRUE
+		WHERE id_config = (
+			SELECT id_config
+			FROM public.exam_config
+			WHERE academic_year = $1
+			  AND semester = $2
+			ORDER BY id_config DESC
+			LIMIT 1
+		)
 	`
-	_, err = s.DB.Exec(updateQuery)
+	_, err = s.DB.Exec(updateQuery, data.AcademicYear, data.Semester)
 	if err != nil {
 		log.Println("Error executing UPDATE query:", err)
 		return err

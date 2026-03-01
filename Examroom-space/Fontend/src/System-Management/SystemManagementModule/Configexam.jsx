@@ -13,6 +13,7 @@ const SystemManagement = () => {
         { value: 'ภาคฤดูร้อน', label: 'ภาคฤดูร้อน' }
     ];
 
+
     const [examConfig, setExamConfig] = useState({
         id: 0,
         academic_year: '',
@@ -30,8 +31,9 @@ const SystemManagement = () => {
         { id: 3, name: 'หน้าสำหรับกรรมการเช็คตารางคุม', status: false }
     ]);
 
-
     const [errors, setErrors] = useState({
+        academic_year: false,
+        semester: false,
         phase: false,
     });
 
@@ -54,10 +56,9 @@ const SystemManagement = () => {
 
     const handleTimeSubmit = async (e) => {
         e.preventDefault();
-        // ถ้าไม่ได้เลือก Phase ให้ขึ้น error ที่ช่อง Phase
-        if (!examConfig.phase || examConfig.phase.trim() === "") {
-            setErrors((prev) => ({ ...prev, phase: true }));
-            alert("กรุณาเลือก Phase");
+
+        if (!validateForm()) {
+            // ถ้าอยาก alert แยกก็ทำได้ แต่ไม่จำเป็นแล้ว เพราะกรอบแดงขึ้น
             return;
         }
 
@@ -87,28 +88,16 @@ const SystemManagement = () => {
 
     const handleModuleSubmit = async (e) => {
         e.preventDefault();
+        if (!validateForm()) return;
         const payload = {
             academicYear: examConfig.academic_year,
             semester: examConfig.semester,
             phase: examConfig.phase,
             modules
         };
-        const validateForm = () => {
-            let newErrors = {};
 
-            if (!examConfig.phase || examConfig.phase.trim() === "") {
-                newErrors.phase = true;
-            }
 
-            setErrors(newErrors);
-            return Object.keys(newErrors).length === 0;
-        };
 
-        const handleSave = () => {
-            if (!validateForm()) return;   // ถ้าไม่ผ่าน validation ให้หยุดเลย
-
-            saveConfig(); // ฟังก์ชันเดิมที่ยิง API
-        };
 
 
         try {
@@ -125,6 +114,29 @@ const SystemManagement = () => {
             alert('เกิดข้อผิดพลาดในการบันทึกการตั้งค่าโมดูล', axios.error);
         }
     };
+
+    const validateForm = () => {
+        const newErrors = {
+            academic_year:
+                !examConfig.academic_year || String(examConfig.academic_year).trim() === "",
+            semester:
+                !examConfig.semester || String(examConfig.semester).trim() === "",
+            phase:
+                !examConfig.phase || String(examConfig.phase).trim() === "",
+        };
+
+        setErrors(newErrors);
+        return !Object.values(newErrors).some(Boolean);
+    };
+    const handleSave = async () => {
+        if (!validateForm()) return;
+
+        await saveConfig();
+        setShowSuccess(true);
+    };
+
+
+
 
     return (
         <>
@@ -144,40 +156,77 @@ const SystemManagement = () => {
                                         <Form.Group className="mb-3">
                                             <Form.Label>ปีการศึกษา</Form.Label>
                                             <Form.Select
+                                                id="academic_year"
+                                                aria-label="ปีการศึกษา"
                                                 value={examConfig.academic_year}
-                                                onChange={(e) => setExamConfig({ ...examConfig, academic_year: e.target.value })}
+                                                isInvalid={!!errors.academic_year}
+                                                onChange={(e) => {
+                                                    const v = e.target.value;
+                                                    setExamConfig(prev => ({ ...prev, academic_year: v }));
+                                                    setErrors(prev => ({ ...prev, academic_year: false })); //  ล้าง error
+                                                }}
+                                            // isInvalid={!!errors.academic_year}
                                             >
                                                 <option value="">เลือกปีการศึกษา</option>
                                                 {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() + 543 + 1 - i).map((year) => (
                                                     <option key={year} value={year}>{year}</option>
                                                 ))}
                                             </Form.Select>
+
+                                            {errors.academic_year && (
+                                                <Form.Control.Feedback type="invalid" className="d-block">
+                                                    กรุณาเลือกปีการศึกษา
+                                                </Form.Control.Feedback>
+                                            )}
                                         </Form.Group>
                                     </Form.Group>
                                 </Col>
                                 <Col md={6}>
                                     <Form.Group className="mb-3">
                                         <Form.Label>ภาคการศึกษา</Form.Label>
-                                        <Select
-                                            value={{ value: examConfig.semester, label: examConfig.semester }}
-                                            onChange={(selected) => setExamConfig({ ...examConfig, semester: selected.value })}
-                                            options={semesterOptions}
-                                            isSearchable={false}
-                                            classNamePrefix="select"
-                                        />
+
+                                        <Form.Select
+                                            id="semester"
+                                            aria-label="ภาคการศึกษา"
+                                            value={examConfig.semester}
+                                            isInvalid={!!errors.semester}
+                                            onChange={(e) => {
+                                                const v = e.target.value;
+                                                setExamConfig(prev => ({ ...prev, semester: v }));
+                                                setErrors(prev => ({ ...prev, semester: false })); // ล้าง error
+                                            }}
+                                        // isInvalid={!!errors.semester}
+                                        >
+                                            <option value="">เลือกภาคการศึกษา</option>
+                                            <option value="ภาคต้น">ภาคต้น</option>
+                                            <option value="ภาคปลาย">ภาคปลาย</option>
+                                            <option value="ภาคฤดูร้อน">ภาคฤดูร้อน</option>
+                                        </Form.Select>
+
+                                        {errors.semester && (
+                                            <Form.Control.Feedback type="invalid" className="d-block">
+                                                กรุณาเลือกภาคการศึกษา
+                                            </Form.Control.Feedback>
+                                        )}
                                     </Form.Group>
+
                                 </Col>
                                 <Col md={6}>
                                     <Form.Group className="mb-3">
                                         <Form.Label>Phase (ช่วงสอบ)</Form.Label>
                                         <Form.Select
-                                            value={examConfig.phase}
+                                            id="phase"
+                                            name="phase"
+                                            aria-label="Phase (ช่วงสอบ)"
+                                            value={examConfig.phase || ""}
                                             onChange={(e) => {
-                                                setExamConfig({ ...examConfig, phase: e.target.value });
-                                                setErrors((prev) => ({ ...prev, phase: false })); // เคลียร์ error เมื่อมีการเลือก
+                                                const v = e.target.value;
+                                                setExamConfig(prev => ({ ...prev, phase: v }));
+                                                setErrors(prev => ({ ...prev, phase: false })); // ล้าง error
                                             }}
-                                            isInvalid={errors.phase} //ทำให้ขึ้นกรอบแดง
+                                            isInvalid={!!errors.phase}
                                         >
+
                                             <option value="">เลือก Phase</option>
                                             <option value="กลางภาค">กลางภาค</option>
                                             <option value="ปลายภาค">ปลายภาค</option>
@@ -190,7 +239,6 @@ const SystemManagement = () => {
 
                                     </Form.Group>
                                 </Col>
-
                             </Row>
                         </Card.Body>
                     </Card>
@@ -253,7 +301,7 @@ const SystemManagement = () => {
                                         </Col>
                                     </Row>
                                 </Form.Group>
-
+                                
 
                                 <div style={{ display: 'flex', gap: '10px', justifyContent: 'left', alignItems: 'center' }}>
                                     <Button style={{ width: "200px" }} variant="primary" type="submit">

@@ -11,39 +11,50 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import Select from "react-select";
-import SidebarMenu from '../Navbar/SidebarMenu';
+import SidebarMenu from "../Navbar/SidebarMenu";
 import "./Examstat-styles.css";
-
 
 const Examstat = () => {
   const [academicYear, setAcademicYear] = useState(null);
   const [semester, setSemester] = useState(null);
+
   const [data, setData] = useState(null);
   const [processedData, setProcessedData] = useState(null);
+
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+
   const [academicYears, setAcademicYears] = useState([]);
   const [semesters, setSemesters] = useState([]);
+
   const [selectedDepartment, setSelectedDepartment] = useState(null);
+
   const OTHER_DEPT_CODE = "999";
   const [dep, setDep] = useState([]);
-  
-  // สร้างข้อมูลสำหรับเรียงลำดับภาควิชา
-   const [DEPARTMENT_ORDER, setDEPARTMENT_ORDER] = useState({});
 
+  // สร้างข้อมูลสำหรับ map id_dept -> name_th (เดิมคุณตั้งชื่อว่า DEPARTMENT_ORDER)
+  const [DEPARTMENT_ORDER, setDEPARTMENT_ORDER] = useState({});
 
-  // สร้างกลุ่มรหัสของแต่ละภาควิชา
+  // กลุ่มรหัสของแต่ละภาควิชา (คงไว้ตามโครงสร้างเดิมของคุณ)
   const DEPARTMENT_GROUPS = {};
-  const DEPARTMENTS = Object.fromEntries(dep.map(({ id_dept_code, id_dept }) => [id_dept_code , DEPARTMENT_ORDER[id_dept]]));
+
+  // ✅ จุดสำคัญ: DEPARTMENTS เป็น map "department_code" -> "ชื่อภาควิชา"
+  // ในโค้ดเดิมมีโอกาส undefined ได้ง่าย แต่ผมคงไว้และให้ fallback "อื่นๆ"
+  const DEPARTMENTS = Object.fromEntries(
+    dep.map(({ id_dept_code, id_dept }) => [
+      id_dept_code,
+      DEPARTMENT_ORDER[id_dept],
+    ])
+  );
 
   Object.entries(DEPARTMENTS).forEach(([code, name]) => {
-    if (!DEPARTMENT_GROUPS[name]) {
-      DEPARTMENT_GROUPS[name] = [];
+    const safeName = name || "อื่นๆ";
+    if (!DEPARTMENT_GROUPS[safeName]) {
+      DEPARTMENT_GROUPS[safeName] = [];
     }
-    DEPARTMENT_GROUPS[name].push(code);
+    DEPARTMENT_GROUPS[safeName].push(code);
   });
 
-  
   useEffect(() => {
     const fetchConfigs = async () => {
       try {
@@ -57,6 +68,7 @@ const Examstat = () => {
             },
           }
         );
+
         const response1 = await fetch(
           localStorage.getItem("API") + "/select_data/departments_group",
           {
@@ -67,8 +79,10 @@ const Examstat = () => {
             },
           }
         );
+
         const response2 = await fetch(
-          localStorage.getItem("API") + "/select_data/departments", {
+          localStorage.getItem("API") + "/select_data/departments",
+          {
             method: "GET",
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -76,23 +90,27 @@ const Examstat = () => {
             },
           }
         );
+
         const data = await response.json();
         const data1 = await response1.json();
         const data2 = await response2.json();
+
+        // map: id_dept -> name_th
         const map = {};
-        data2.forEach(dep => {
+        data2.forEach((dep) => {
           map[dep.id_dept] = dep.name_th;
-          //console.log("user.id_dept" , dep.name_th)
-         
         });
-         setDEPARTMENT_ORDER(map)
+
+        setDEPARTMENT_ORDER(map);
         setDep(data1);
+
         const years = [...new Set(data.map((c) => c.academic_year))].map(
           (year) => ({
             value: year,
             label: `ปีการศึกษา ${year}`,
           })
         );
+
         const terms = [...new Set(data.map((c) => c.semester))].map((term) => ({
           value: term,
           label: term,
@@ -109,18 +127,17 @@ const Examstat = () => {
     fetchConfigs();
   }, []);
 
-  // แปลงข้อมูลเพื่อรวมภาควิชาที่มีชื่อเดียวกัน
+  // ✅ แปลงข้อมูลเพื่อรวมภาควิชาที่มีชื่อเดียวกัน + เรียงลำดับแบบ “ฟิก”
   const processSubmissionData = (data) => {
     if (!data?.submissions) return null;
 
     const departmentData = new Map();
 
-    // รวมข้อมูลตามชื่อภาควิชา
     data.submissions.forEach((dept) => {
+      // dept.department_code -> name (fallback เป็น "อื่นๆ")
       const deptName = DEPARTMENTS[dept.department_code] || "อื่นๆ";
 
       if (departmentData.has(deptName)) {
-        // ถ้าภาควิชานี้มีอยู่แล้ว ให้รวมข้อมูล
         const existing = departmentData.get(deptName);
         existing.submitted += Math.round(dept.submitted);
         existing.pending += Math.round(dept.pending);
@@ -128,7 +145,6 @@ const Examstat = () => {
         existing.deptCodes.push(dept.department_code);
         existing.courses = [...existing.courses, ...dept.courses];
       } else {
-        // ถ้าเป็นภาควิชาใหม่
         departmentData.set(deptName, {
           name: deptName,
           submitted: Math.round(dept.submitted),
@@ -136,14 +152,20 @@ const Examstat = () => {
           total_exams: Math.round(dept.total_exams),
           deptCodes: [dept.department_code],
           courses: dept.courses,
-          order: DEPARTMENT_ORDER[deptName] || 999,
         });
       }
     });
 
-    // แปลงข้อมูลให้เป็น array และเรียงลำดับตาม order
+    // ✅ จุดแก้หลัก: เรียงแบบคงที่ ไม่สลับไปมา
+    // 1) pending มาก -> มาก่อน
+    // 2) total_exams มาก -> มาก่อน
+    // 3) ชื่อไทย A-Z -> กันสลับ
     const processedSubmissions = Array.from(departmentData.values()).sort(
-      (a, b) => a.order - b.order
+      (a, b) => {
+        if (b.pending !== a.pending) return b.pending - a.pending;
+        if (b.total_exams !== a.total_exams) return b.total_exams - a.total_exams;
+        return a.name.localeCompare(b.name, "th");
+      }
     );
 
     return {
@@ -211,12 +233,12 @@ const Examstat = () => {
     if (academicYear?.value && semester?.value) {
       fetchSubmissionData();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [academicYear, semester]);
 
   const getChartData = () => {
     if (!processedData?.processedSubmissions) return [];
 
-    // แปลงข้อมูลสำหรับแสดงในกราฟ
     return processedData.processedSubmissions.map((dept) => ({
       name: dept.name,
       ส่งแล้ว: dept.submitted,
@@ -264,11 +286,7 @@ const Examstat = () => {
                     <td>{course.lecturer}</td>
                     <td>
                       <Badge
-                        bg={
-                          course.submit_status === "ส่งแล้ว"
-                            ? "success"
-                            : "warning"
-                        }
+                        bg={course.submit_status === "ส่งแล้ว" ? "success" : "warning"}
                         className="badge-pill"
                       >
                         {course.submit_status}
@@ -308,11 +326,7 @@ const Examstat = () => {
             รหัสภาควิชา: {payload[0]?.payload?.deptCodes}
           </p>
           {payload.map((entry, index) => (
-            <p
-              key={index}
-              className="tooltip-item"
-              style={{ color: entry.color }}
-            >
+            <p key={index} className="tooltip-item" style={{ color: entry.color }}>
               <span>{entry.name}:</span>{" "}
               <span className="fw-bold">{entry.value} วิชา</span>
             </p>
@@ -326,16 +340,11 @@ const Examstat = () => {
   const getSortedDepartmentOptions = () => {
     if (!processedData?.processedSubmissions) return [];
 
-    // สร้าง options สำหรับ dropdown และเรียงลำดับตามชื่อภาควิชา
-    return processedData.processedSubmissions
-      .map((dept) => ({
-        value: dept.name,
-        label: `${dept.name} (${dept.deptCodes.join(", ")}) - ${
-          dept.total_exams
-        } วิชา`,
-        order: dept.order,
-      }))
-      .sort((a, b) => a.order - b.order);
+    // ✅ ให้ dropdown เรียง “แบบเดียวกับกราฟ” (ฟิกเหมือนกัน)
+    return processedData.processedSubmissions.map((dept) => ({
+      value: dept.name,
+      label: `${dept.name} (${dept.deptCodes.join(", ")}) - ${dept.total_exams} วิชา`,
+    }));
   };
 
   return (
@@ -362,6 +371,7 @@ const Examstat = () => {
                     className="examstat-select"
                   />
                 </div>
+
                 <div className="col-md-5">
                   <label className="form-label">ภาคการศึกษา</label>
                   <Select
@@ -373,6 +383,7 @@ const Examstat = () => {
                     className="examstat-select"
                   />
                 </div>
+
                 <div className="col-md-2 d-flex align-items-end">
                   <button
                     className="btn btn-primary w-100"
@@ -435,6 +446,7 @@ const Examstat = () => {
                           <p className="mb-0">วิชา</p>
                         </div>
                       </div>
+
                       <div className="col-md-4">
                         <div className="stats-card success-card shadow-sm">
                           <h6 className="text-muted mb-2">ส่งแล้ว</h6>
@@ -444,14 +456,13 @@ const Examstat = () => {
                           <p className="mb-0">
                             วิชา (
                             {stats.total > 0
-                              ? Math.round(
-                                  (stats.submitted / stats.total) * 100
-                                )
+                              ? Math.round((stats.submitted / stats.total) * 100)
                               : 0}
                             %)
                           </p>
                         </div>
                       </div>
+
                       <div className="col-md-4">
                         <div className="stats-card warning-card shadow-sm">
                           <h6 className="text-muted mb-2">ยังไม่ส่ง</h6>
@@ -479,6 +490,7 @@ const Examstat = () => {
                     {academicYear?.label} {semester?.label}
                   </span>
                 </Card.Header>
+
                 <Card.Body>
                   <div className="chart-container">
                     <ResponsiveContainer width="100%" height="100%">
@@ -490,7 +502,7 @@ const Examstat = () => {
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis
                           type="number"
-                          tickFormatter={(value) => Math.round(value)} // แสดงจำนวนเต็ม
+                          tickFormatter={(value) => Math.round(value)}
                         />
                         <YAxis
                           type="category"
@@ -500,6 +512,7 @@ const Examstat = () => {
                         />
                         <Tooltip content={getCustomTooltip} />
                         <Legend wrapperStyle={{ paddingTop: "10px" }} />
+
                         <Bar
                           dataKey="ส่งแล้ว"
                           stackId="a"

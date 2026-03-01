@@ -16,12 +16,20 @@ type RoomExam struct {
 	Proctor    string `json:"Proctor"`
 }
 
+type SeatPlanPayload struct {
+	OddPattern   []int `json:"odd_pattern"`
+	EvenPattern  []int `json:"even_pattern"`
+	ExtraRowSize int   `json:"extra_row_size"`
+}
+
+
 // Room model
 type Room struct {
 	RoomID   string `json:"room_id"`
 	RoomName string `json:"room_name"`
 	Capacity int    `json:"capacity"`
 	RoomType string `json:"room_type"`
+	SeatPlan *SeatPlanPayload `json:"seat_plan,omitempty"` 
 }
 
 type FormData struct {
@@ -180,4 +188,18 @@ type Departments_group struct {
 	Id           int    `json:"id"`
 	Id_dept      int    `json:"id_dept"`
 	Id_dept_code string `json:"id_dept_code"`
+}
+
+type RoomSeatPlan struct {
+	RoomID       string `json:"room_id"`
+	OddPattern   []int  `json:"odd_pattern"`
+	EvenPattern  []int  `json:"even_pattern"`
+	ExtraRowSize int    `json:"extra_row_size"`
+}
+
+type CreateRoomReq struct {
+	RoomName string        `json:"room_name"`
+	RoomType string        `json:"room_type"`
+	Capacity int           `json:"capacity"`
+	SeatPlan *RoomSeatPlan `json:"seat_plan,omitempty"`
 }

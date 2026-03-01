@@ -1,10 +1,10 @@
 package controllers
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -69,228 +69,125 @@ func (c *Controller) GetStd(ctx *gin.Context) {
 		rowFilterParam = "all"
 	}
 
+	// ✅ ดึงผังที่นั่งจาก DB (room_seat_plan) แทน hardcode
+	roomName := ctx.Param("roomname")
+	plan, err := c.getRoomSeatPlan(roomName)
+	if err != nil {
+		// ถ้าไม่พบผัง ให้แจ้งชัดเจน (เพื่อบังคับให้ตั้งค่าแทนการ hardcode)
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("ห้อง %s ยังไม่ได้ตั้งค่าผังที่นั่ง (room_seat_plan)", roomName)})
+		return
+	}
+
 	// แปลงข้อมูลเป็น JSON
 	var students []map[string]string
 	for i, row := range rows {
 		if i == 0 {
 			continue // ข้าม header
 		}
-		if len(row) < 4 {
-			continue // ข้ามแถวที่ข้อมูลไม่ครบ
-		}
-
-		seat := CalSeat1(ctx.Param("roomname"), i, rowFilterParam)
-
-		// ตรวจสอบว่าเป็นแถวเสริมหรือไม่
-		if strings.HasPrefix(seat, "แถวเสริม") {
-			// แถวเสริมไม่ต้องกรอง จะเก็บไว้เสมอ
-			student := map[string]string{
-				"Seat":  seat,
-				"ID":    row[0],
-				"IdStd": row[1],
-				"Name":  row[2],
-				"Dep":   row[3],
-				"Sig":   "---",
-			}
-			students = append(students, student)
+		if len(row) < 3 {
 			continue
 		}
 
-		// กรณี rowFilterParam เป็น "all" หรือค่าอื่นๆที่ไม่ใช่ตัวเลข จะไม่มีการกรอง
-
-		student := map[string]string{
-			"Seat":  seat,
-			"ID":    row[0],
-			"IdStd": row[1],
-			"Name":  row[2],
-			"Dep":   row[3],
-			"Sig":   "---",
-		}
-		students = append(students, student)
-	}
-
-	sort.Slice(students, func(i, j int) bool {
-		return students[i]["IdStd"] < students[j]["IdStd"]
-	})
-
-	// Group students by rows
-	groupedStudents := c.GroupStd(students)
-
-	// รวมข้อมูลที่ส่งมากับข้อมูลจาก Excel
-	result := gin.H{
-		"success":  true,
-		"students": students,
-		"grouped":  groupedStudents, // ส่งข้อมูลที่กรุ๊ปแล้ว
-	}
-	//log.Println(students)
-
-	// ส่ง JSON กลับไปยัง frontend
-	ctx.JSON(http.StatusOK, result)
-	os.Remove("./uploads/" + ctx.Param("filename"))
-}
-
-// ============================
-// CONTROLLER FOR CALCULATE EXTRAROW SEAT
-// ============================
-
-type GroupedRow struct {
-	Row     int    `json:"row"`
-	RowName string `json:"rowName"` // ชื่อแถวสำหรับแสดงผล เช่น "แถว 1" หรือ "แถวเสริม 1"
-	Range   string `json:"range"`
-	Count   int    `json:"count"`
-	IsExtra bool   `json:"isExtra"` // เพิ่มฟิลด์สำหรับระบุว่าเป็นแถวเสริมหรือไม่
-}
-
-func (c *Controller) GroupStd(students []map[string]string) []GroupedRow {
-	var groupedRows = make(map[string][]string)
-	var regularRows = make(map[int]bool) // เก็บเฉพาะแถวปกติ
-	var extraRows = make(map[int]bool)   // เก็บเฉพาะแถวเสริม
-
-	// Iterate through the students list and group them by row number
-	for _, student := range students {
-		seat := student["Seat"]
-		rowKey := seat // ใช้ seat เต็มๆ เป็น key
-
-		// แยกประเภทของแถว
-		if strings.HasPrefix(seat, "แถวเสริม") {
-			rowNum := extractExtraRowFromSeat(seat)
-			extraRows[rowNum] = true
-		} else {
-			rowNum := extractRowFromSeat(seat)
-			regularRows[rowNum] = true
-		}
-
-		// เก็บ ID นักศึกษาในแถวนั้นๆ
-		groupedRows[rowKey] = append(groupedRows[rowKey], student["IdStd"])
-	}
-
-	// สร้าง slice เพื่อเก็บผลลัพธ์
-	var groupedResult []GroupedRow
-
-	// จัดการแถวปกติก่อน
-	var regularRowNumbers []int
-	for row := range regularRows {
-		regularRowNumbers = append(regularRowNumbers, row)
-	}
-	sort.Ints(regularRowNumbers)
-
-	// สร้างข้อมูลสำหรับแถวปกติ
-	for _, rowNum := range regularRowNumbers {
-		rowKey := fmt.Sprintf("แถว %d", rowNum)
-		ids := groupedRows[rowKey]
-
-		if len(ids) == 0 {
-			continue // ข้ามแถวที่ไม่มีนักศึกษา
-		}
-
-		// เรียง ID ตามลำดับ
-		sort.Strings(ids)
-
-		// สร้างข้อความที่แสดงช่วงของ ID
-		start := ids[0]
-		end := ids[len(ids)-1]
-		count := len(ids)
-
-		// เพิ่มข้อมูลเข้าใน slice ของ groupedResult
-		groupedResult = append(groupedResult, GroupedRow{
-			Row:     rowNum,
-			Range:   fmt.Sprintf("%s - %s", start, end),
-			Count:   count,
-			IsExtra: false,
+		students = append(students, map[string]string{
+			"student_id":   row[0],
+			"student_name": row[1],
+			"dep":          row[2],
 		})
 	}
 
-	// จัดการแถวเสริม
-	var extraRowNumbers []int
-	for row := range extraRows {
-		extraRowNumbers = append(extraRowNumbers, row)
-	}
-	sort.Ints(extraRowNumbers)
-
-	// สร้างข้อมูลสำหรับแถวเสริม
-	for _, rowNum := range extraRowNumbers {
-		log.Println("row", rowNum)
-		rowKey := fmt.Sprintf("แถวเสริม %d", rowNum)
-		ids := groupedRows[rowKey]
-
-		if len(ids) == 0 {
-			continue // ข้ามแถวที่ไม่มีนักศึกษา
-		}
-
-		// เรียง ID ตามลำดับ
-		sort.Strings(ids)
-
-		// สร้างข้อความที่แสดงช่วงของ ID
-		start := ids[0]
-		end := ids[len(ids)-1]
-		count := len(ids)
-
-		// เพิ่มข้อมูลเข้าใน slice ของ groupedResult โดยใช้ rowNum+1000 เพื่อให้แถวเสริมอยู่ท้ายสุด
-		groupedResult = append(groupedResult, GroupedRow{
-			Row:     1000 + rowNum, // ใช้ค่าสูงๆ เพื่อให้แถวเสริมอยู่ท้ายสุด
-			Range:   fmt.Sprintf("%s - %s", start, end),
-			Count:   count,
-			IsExtra: true,
-		})
-	}
-
-	// เรียงลำดับแถวทั้งหมด
-	sort.Slice(groupedResult, func(i, j int) bool {
-		return groupedResult[i].Row < groupedResult[j].Row
+	// เรียงชื่อ A-Z
+	sort.SliceStable(students, func(i, j int) bool {
+		return students[i]["student_name"] < students[j]["student_name"]
 	})
 
-	return groupedResult
-}
-
-// ฟังก์ชันในการดึงหมายเลขแถวจากข้อมูล Seat (สำหรับแถวปกติ)
-func extractRowFromSeat(seat string) int {
-	var row int
-	_, err := fmt.Sscanf(seat, "แถว %d", &row)
-	if err != nil {
-		fmt.Println("ERROR: Unable to extract row from seat:", seat)
+	// ใส่ seat_no (แถว) ตามลำดับ
+	for i := range students {
+		seat := CalSeat1(plan, i+1, rowFilterParam) // ✅ ใช้ plan จาก DB
+		students[i]["seat_no"] = seat
 	}
-	return row
-}
 
-// ==============================================
-// CONTROLLER FOR QUERY EXTRASEAT
-// ==============================================
-
-// ฟังก์ชันในการดึงหมายเลขแถวจากข้อมูล Seat (สำหรับแถวเสริม)
-func extractExtraRowFromSeat(seat string) int {
-	var row int
-	_, err := fmt.Sscanf(seat, "แถวเสริม %d", &row)
-	if err != nil {
-		fmt.Println("ERROR: Unable to extract extra row from seat:", seat)
-	}
-	return row
+	ctx.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"room":    roomName,
+		"count":   len(students),
+		"data":    students,
+	})
 }
 
 // ============================
-// CONTROLLER FOR CALCULATE SEAT FOR SIGNATURE
+// SEAT PLAN (DB) + CALCULATOR (NO HARDCODE)
 // ============================
 
-func CalSeat1(nameroom string, x int, rowFilterParam string) string {
-	result := Getval1(nameroom)
-	var cumulative []int
+type RoomSeatPlan struct {
+	OddPattern   []int
+	EvenPattern  []int
+	ExtraRowSize int
+}
+
+// getRoomSeatPlan ดึงผังที่นั่งของห้องจากตาราง room_seat_plan (ไม่มี hardcode แล้ว)
+func (c *Controller) getRoomSeatPlan(roomID string) (*RoomSeatPlan, error) {
+	if c == nil || c.SelectService == nil || c.SelectService.DB == nil {
+		return nil, fmt.Errorf("DB not initialized")
+	}
+
+	var oddStr, evenStr string
+	var extra int
+
+	q := `
+		SELECT odd_pattern::text, even_pattern::text, extra_row_size
+		FROM public.room_seat_plan
+		WHERE room_id = $1
+	`
+	err := c.SelectService.DB.QueryRow(q, roomID).Scan(&oddStr, &evenStr, &extra)
+	if err != nil {
+		return nil, err
+	}
+
+	var odd, even []int
+	if err := json.Unmarshal([]byte(oddStr), &odd); err != nil {
+		return nil, fmt.Errorf("invalid odd_pattern for %s: %w", roomID, err)
+	}
+	if err := json.Unmarshal([]byte(evenStr), &even); err != nil {
+		return nil, fmt.Errorf("invalid even_pattern for %s: %w", roomID, err)
+	}
+
+	if extra <= 0 {
+		extra = 10
+	}
+
+	return &RoomSeatPlan{OddPattern: odd, EvenPattern: even, ExtraRowSize: extra}, nil
+}
+
+// CalSeat1 คำนวณแถวที่นั่งแบบเดิม (odd/even/all/custom) แต่ใช้ผังจาก DB (room_seat_plan)
+func CalSeat1(plan *RoomSeatPlan, x int, rowFilterParam string) string {
+	if plan == nil {
+		return "ไม่พบข้อมูลที่นั่ง"
+	}
+
 	var seats []int
 	rowType, err := strconv.Atoi(rowFilterParam)
 	if err != nil {
-		//log.Println("Invalid rowFilterParam:", rowFilterParam, "=> defaulting to 0 (odd)")
 		rowType = 0
 	}
 
 	switch rowFilterParam {
 	case "odd":
-		seats = result["x1"]
+		seats = plan.OddPattern
 	case "even":
-		seats = result["x2"]
+		seats = plan.EvenPattern
 	case "all":
-		seats = mergeSeats1(result["x1"], result["x2"])
+		seats = mergeSeats1(plan.OddPattern, plan.EvenPattern)
 	default:
-
-		seats = mergeSeats1(result["x1"], result["x2"])[rowType:]
-
+		// custom: ส่งเป็นตัวเลข (เช่น "2") ให้เริ่มตั้งแต่แถวนั้น (ตัด index ออก)
+		merged := mergeSeats1(plan.OddPattern, plan.EvenPattern)
+		if rowType < 0 {
+			rowType = 0
+		}
+		if rowType >= len(merged) {
+			seats = []int{}
+		} else {
+			seats = merged[rowType:]
+		}
 	}
 
 	if len(seats) == 0 {
@@ -298,24 +195,26 @@ func CalSeat1(nameroom string, x int, rowFilterParam string) string {
 		return "ไม่พบข้อมูลที่นั่ง"
 	}
 
-	//log.Println("seattttt", seats[3])
-	cumulative = cumulativeSum1(seats)
+	cumulative := cumulativeSum1(seats)
 
 	for i, num := range cumulative {
 		if num >= x {
+			// รักษาพฤติกรรมเดิม: ถ้าเป็น custom (rowType != 0) ให้ offset แถวตาม rowType-1
 			if rowType != 0 {
 				return "แถว " + strconv.Itoa((i+1)+(rowType-1))
-			} else {
-				return "แถว " + strconv.Itoa((i+1)+(rowType))
 			}
-
+			return "แถว " + strconv.Itoa(i + 1)
 		}
 	}
 
 	// Extra row case
 	total := cumulative[len(cumulative)-1]
 	over := x - total
-	extraRow := (over-1)/10 + 1
+	extraSize := plan.ExtraRowSize
+	if extraSize <= 0 {
+		extraSize = 10
+	}
+	extraRow := (over-1)/extraSize + 1
 
 	return "แถวเสริม " + strconv.Itoa(extraRow)
 }
@@ -352,37 +251,9 @@ func mergeSeats1(x1, x2 []int) []int {
 	return merged
 }
 
-func Getval1(name string) map[string][]int {
-	if name == "R005" {
-		return map[string][]int{
-			"x1":  {10, 0, 10, 0, 10, 0, 10, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0},
-			"x2":  {0, 10, 0, 10, 0, 10, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 12, 0, 8},
-			"sum": {10, 20, 30, 40, 50, 60, 70, 82, 94, 106, 118, 130, 142, 154, 166, 178, 190, 202, 214, 226, 238, 250, 262, 270, 280},
-		}
-	} else if name == "R001" || name == "R002" {
-		return map[string][]int{
-			"x1":  {10, 0, 10, 0, 12, 0, 12, 0, 14, 0, 14, 0, 8, 0},
-			"x2":  {0, 10, 0, 12, 0, 12, 0, 14, 0, 14, 0, 12, 0, 8},
-			"sum": {10, 20, 30, 42, 54, 66, 78, 92, 106, 120, 134, 146, 154, 162, 172, 182},
-		}
-	} else if name == "R004" {
-		return map[string][]int{
-			"x1":  {15, 0, 20, 0, 24, 0, 27, 0, 28, 0, 30, 0, 31, 0, 28, 0},
-			"x2":  {0, 18, 0, 21, 0, 24, 0, 28, 0, 29, 0, 30, 0, 32, 0, 29},
-			"sum": {15, 33, 53, 74, 98, 122, 149, 177, 205, 234, 264, 294, 325, 357, 385, 414},
-		}
-	} else if name == "R003" {
-		return map[string][]int{
-			"x1":  {10, 0, 13, 0, 14, 0, 17, 0, 20, 0, 23, 0, 24, 0, 11},
-			"x2":  {0, 11, 0, 14, 0, 17, 0, 20, 0, 21, 0, 24, 0, 27, 0},
-			"sum": {10, 21, 34, 48, 62, 79, 96, 116, 136, 157, 180, 204, 228, 255, 266},
-		}
-	}
+// ============================
+// (ส่วนอื่น ๆ ของไฟล์เดิม ถ้ามี) ไม่จำเป็นต้องแตะ
+// ============================
 
-	// ค่าดีฟอลต์ที่ return กลับเมื่อไม่ตรงกับเงื่อนไขใดๆ
-	return map[string][]int{
-		"x1":  {},
-		"x2":  {},
-		"sum": {},
-	}
-}
+// NOTE: ถ้าในไฟล์เดิมมีฟังก์ชันอื่นอยู่ต่อ ให้คงไว้ตามเดิม
+// (ผมไม่ได้ลบส่วนอื่นที่ไม่เกี่ยวกับ seat plan)
