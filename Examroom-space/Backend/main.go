@@ -18,7 +18,6 @@ func normalizeURL(u string) string {
 }
 
 func getFrontendURL() string {
-	// รองรับทั้งชื่อเดิมและชื่อที่สะกดถูก
 	host := os.Getenv("URL_FONTEND")
 	if host == "" {
 		host = os.Getenv("URL_FRONTEND")
@@ -30,26 +29,35 @@ func getFrontendURL() string {
 	return normalizeURL(host)
 }
 
-func getAllowedOrigins(frontendURL string) []string {
-	origins := []string{
-		frontendURL,
-		"http://localhost:3000",
-		"http://localhost:5173",
-		"http://127.0.0.1:3000",
-		"http://127.0.0.1:5173",
+func isAllowedOrigin(origin string, frontendURL string) bool {
+	origin = normalizeURL(origin)
+	if origin == "" {
+		return false
 	}
 
-	seen := make(map[string]bool)
-	var result []string
-	for _, origin := range origins {
-		origin = normalizeURL(origin)
-		if origin == "" || seen[origin] {
-			continue
-		}
-		seen[origin] = true
-		result = append(result, origin)
+	allowedExact := map[string]bool{
+		normalizeURL(frontendURL):             true,
+		"https://project-superend.vercel.app": true,
+		"https://examroom-space.vercel.app":   true,
+		"http://localhost:3000":               true,
+		"http://localhost:5173":               true,
+		"http://127.0.0.1:3000":               true,
+		"http://127.0.0.1:5173":               true,
 	}
-	return result
+
+	if allowedExact[origin] {
+		return true
+	}
+
+	if strings.HasSuffix(origin, ".vercel.app") {
+		return true
+	}
+
+	if strings.HasSuffix(origin, ".su.ac.th") {
+		return true
+	}
+
+	return false
 }
 
 func SecurityHeaders(frontendURL string) gin.HandlerFunc {
@@ -57,6 +65,9 @@ func SecurityHeaders(frontendURL string) gin.HandlerFunc {
 		connectSrc := strings.Join([]string{
 			"'self'",
 			frontendURL,
+			"https://project-superend.vercel.app",
+			"https://examroom-space.vercel.app",
+			"https://*.vercel.app",
 			"http://localhost:8080",
 			"http://localhost:3000",
 			"http://localhost:5173",
@@ -114,7 +125,6 @@ func CustomRecovery() gin.HandlerFunc {
 }
 
 func main() {
-	// Initialize database connection with connection pooling
 	db, err := config.Connect()
 	if err != nil {
 		fmt.Printf("Failed to connect to database: %v\n", err)
@@ -122,7 +132,6 @@ func main() {
 	}
 	defer db.Close()
 
-	// Test database connection
 	if err := db.Ping(); err != nil {
 		fmt.Printf("Failed to ping database: %v\n", err)
 		os.Exit(1)
@@ -130,7 +139,6 @@ func main() {
 	fmt.Println("Database connected successfully with connection pooling")
 
 	frontendURL := getFrontendURL()
-	allowedOrigins := getAllowedOrigins(frontendURL)
 
 	if os.Getenv("ENVIRONMENT") == "production" {
 		gin.SetMode(gin.ReleaseMode)
@@ -144,7 +152,9 @@ func main() {
 	r.Use(CustomRecovery())
 
 	r.Use(cors.New(cors.Config{
-		AllowOrigins: allowedOrigins,
+		AllowOriginFunc: func(origin string) bool {
+			return isAllowedOrigin(origin, frontendURL)
+		},
 		AllowMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders: []string{
 			"Origin",
@@ -162,10 +172,6 @@ func main() {
 		AllowFiles:       false,
 	}))
 
-	// Rate limiting middleware (ถ้าต้องการ)
-	// r.Use(ratelimit.RateLimiter(time.Second, 100))
-
-	// ตั้งค่า Routes with database connection
 	routes.SetupRoutes(r, db)
 
 	port := os.Getenv("PORT")
@@ -176,7 +182,6 @@ func main() {
 	fmt.Println("Frontend URL ::: " + frontendURL)
 	fmt.Println("Running HTTP on port " + port)
 
-	// Environment-based server configuration
 	if os.Getenv("ENVIRONMENT") == "production" {
 		cert := os.Getenv("SSL_CERT_PATH")
 		key := os.Getenv("SSL_KEY_PATH")
