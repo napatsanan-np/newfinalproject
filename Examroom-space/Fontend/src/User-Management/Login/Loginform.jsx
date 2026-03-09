@@ -1,14 +1,20 @@
 import { useState } from "react";
 import { Container, Form, Button, Image } from "react-bootstrap";
 import { useNavigate } from 'react-router-dom';
-import Swal from "sweetalert2"; // Import SweetAlert2
+import Swal from "sweetalert2";
 import SUlogo from "./SU_logo.png";
-import './Loginform-styles.css'; // Ensure you have this CSS file for additional styling
+import './Loginform-styles.css';
 
 function Loginform() {
   const [Name, setName] = useState("");
   const [Password, setPassword] = useState("");
   const navigate = useNavigate();
+
+  // fallback กันค่า API เป็น null
+  const API_BASE =
+    localStorage.getItem("API") ||
+    "https://projectsuperend-production.up.railway.app/api";
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!Name || !Password) {
@@ -20,28 +26,26 @@ function Loginform() {
       return;
     }
 
-    // ส่งรหัสผ่านโดยตรง
     getData(Password);
   };
 
   async function getData(password) {
     try {
-      const response = await fetch(`${localStorage.getItem('API')}/login`, {
+      const response = await fetch(`${API_BASE}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: Name, password: password }), // ส่งรหัสผ่านโดยตรง
+        body: JSON.stringify({ username: Name, password: password }),
       });
 
       const result = await response.json();
       if (response.ok) {
-        // Save token in localStorage
         localStorage.setItem('token', result.token);
         localStorage.setItem('user', JSON.stringify(result.user));
         localStorage.setItem('roles', JSON.stringify(result.user.roles));
 
         window.User = JSON.parse(localStorage.getItem('user'));
         console.log("Data User:::", window.User);
-        navigate('/Home'); // Navigate to Home on successful login
+        navigate('/Home');
       } else {
         Swal.fire({
           icon: 'error',
@@ -58,17 +62,15 @@ function Loginform() {
       });
     }
   }
+
   const handleSSOLogin = () => {
-    // ตัวอย่าง URL สำหรับเริ่ม SSO login
-    // เปลี่ยน URL นี้เป็น URL ของระบบ SSO ที่คุณใช้จริง
-    const ssoLoginUrl = `${localStorage.getItem('API')}/sso/login`;
+    const ssoLoginUrl = `${API_BASE}/sso/login`;
     window.location.href = ssoLoginUrl;
   };
 
   return (
     <Container className="d-flex align-items-center justify-content-center min-vh-100 p-4">
       <div className="login-form">
-        {/* จัดรูปภาพให้อยู่ตรงกลาง */}
         <div className="d-flex justify-content-center">
           <Image src={SUlogo} className="mb-4" width={200} alt="SU Logo" />
         </div>
@@ -95,7 +97,6 @@ function Loginform() {
           <Button id="login_button" type="submit" variant="primary" className="w-100 mb-3">
             ล็อกอิน
           </Button>
-          {/* ปุ่ม SSO */}
           <Button
             variant="outline-secondary"
             className="w-100"
