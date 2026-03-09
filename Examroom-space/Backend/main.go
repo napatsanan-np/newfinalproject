@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/config"
@@ -12,24 +13,74 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SecurityHeaders() gin.HandlerFunc {
+func normalizeURL(u string) string {
+	return strings.TrimRight(strings.TrimSpace(u), "/")
+}
+
+func getFrontendURL() string {
+	// รองรับทั้งชื่อเดิมและชื่อที่สะกดถูก
+	host := os.Getenv("URL_FONTEND")
+	if host == "" {
+		host = os.Getenv("URL_FRONTEND")
+	}
+	if host == "" {
+		fmt.Println("Warning: URL_FONTEND / URL_FRONTEND is not set. Using default localhost.")
+		host = "http://localhost:5173"
+	}
+	return normalizeURL(host)
+}
+
+func getAllowedOrigins(frontendURL string) []string {
+	origins := []string{
+		frontendURL,
+		"http://localhost:3000",
+		"http://localhost:5173",
+		"http://127.0.0.1:3000",
+		"http://127.0.0.1:5173",
+	}
+
+	seen := make(map[string]bool)
+	var result []string
+	for _, origin := range origins {
+		origin = normalizeURL(origin)
+		if origin == "" || seen[origin] {
+			continue
+		}
+		seen[origin] = true
+		result = append(result, origin)
+	}
+	return result
+}
+
+func SecurityHeaders(frontendURL string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// อัพเดท CSP
+		connectSrc := strings.Join([]string{
+			"'self'",
+			frontendURL,
+			"http://localhost:8080",
+			"http://localhost:3000",
+			"http://localhost:5173",
+			"http://127.0.0.1:8080",
+			"http://127.0.0.1:3000",
+			"http://127.0.0.1:5173",
+			"https:",
+			"wss:",
+		}, " ")
+
 		c.Header("Content-Security-Policy",
 			"default-src 'self'; "+
 				"script-src 'self' 'unsafe-inline' 'unsafe-eval'; "+
 				"style-src 'self' 'unsafe-inline'; "+
 				"img-src 'self' data: blob: https:; "+
-				"font-src 'self' data:; "+
-				"connect-src 'self' http://localhost:8080 http://localhost:3000/ "+
-				"media-src 'self'; "+
+				"font-src 'self' data: https:; "+
+				"connect-src "+connectSrc+"; "+
+				"media-src 'self' blob: data:; "+
 				"object-src 'none'; "+
 				"child-src 'self'; "+
 				"frame-ancestors 'none'; "+
 				"form-action 'self'; "+
 				"base-uri 'self';")
 
-		// เพิ่ม Security Headers
 		c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		c.Header("X-Frame-Options", "DENY")
 		c.Header("X-Content-Type-Options", "nosniff")
@@ -40,10 +91,24 @@ func SecurityHeaders() gin.HandlerFunc {
 		c.Header("Cross-Origin-Opener-Policy", "same-origin")
 		c.Header("Cross-Origin-Resource-Policy", "same-origin")
 
-		// ลบ headers ที่อาจเปิดเผยข้อมูล
 		c.Header("Server", "")
 		c.Header("X-Powered-By", "")
 
+		c.Next()
+	}
+}
+
+// Custom recovery middleware
+func CustomRecovery() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		defer func() {
+			if err := recover(); err != nil {
+				c.Header("Content-Type", "application/json")
+				c.JSON(500, gin.H{
+					"error": "Internal Server Error",
+				})
+			}
+		}()
 		c.Next()
 	}
 }
@@ -64,22 +129,23 @@ func main() {
 	}
 	fmt.Println("Database connected successfully with connection pooling")
 
-	gin.SetMode(gin.DebugMode)
-	r := gin.New()
-	r.Use(gin.Logger())
-	r.Use(SecurityHeaders())
-	r.Use(CustomRecovery())
+	frontendURL := getFrontendURL()
+	allowedOrigins := getAllowedOrigins(frontendURL)
 
-	host := os.Getenv("URL_FONTEND")
-	if host == "" {
-		fmt.Println("Warning: URL_FONTEND is not set. Using default localhost.")
-		host = "http://localhost:5173"
+	if os.Getenv("ENVIRONMENT") == "production" {
+		gin.SetMode(gin.ReleaseMode)
+	} else {
+		gin.SetMode(gin.DebugMode)
 	}
 
-	// อัพเดท CORS configuration
+	r := gin.New()
+	r.Use(gin.Logger())
+	r.Use(SecurityHeaders(frontendURL))
+	r.Use(CustomRecovery())
+
 	r.Use(cors.New(cors.Config{
-		AllowOrigins: []string{host},
-		AllowMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowOrigins: allowedOrigins,
+		AllowMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders: []string{
 			"Origin",
 			"Content-Type",
@@ -92,11 +158,9 @@ func main() {
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 		AllowWildcard:    false,
-		AllowWebSockets:  false,
+		AllowWebSockets:  true,
 		AllowFiles:       false,
 	}))
-
-	// Security Headers middleware
 
 	// Rate limiting middleware (ถ้าต้องการ)
 	// r.Use(ratelimit.RateLimiter(time.Second, 100))
@@ -104,36 +168,35 @@ func main() {
 	// ตั้งค่า Routes with database connection
 	routes.SetupRoutes(r, db)
 
-	fmt.Println("รันที่ DNS ::: " + host)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	fmt.Println("Frontend URL ::: " + frontendURL)
+	fmt.Println("Running HTTP on port " + port)
 
 	// Environment-based server configuration
 	if os.Getenv("ENVIRONMENT") == "production" {
-		// Production settings
 		cert := os.Getenv("SSL_CERT_PATH")
 		key := os.Getenv("SSL_KEY_PATH")
+
 		if cert != "" && key != "" {
-			r.RunTLS(":443", cert, key)
+			if err := r.RunTLS(":443", cert, key); err != nil {
+				fmt.Printf("Failed to start HTTPS server: %v\n", err)
+				os.Exit(1)
+			}
 		} else {
 			fmt.Println("Warning: SSL certificate paths not set. Running without TLS.")
-			r.Run(":8080")
+			if err := r.Run(":" + port); err != nil {
+				fmt.Printf("Failed to start server: %v\n", err)
+				os.Exit(1)
+			}
 		}
 	} else {
-		// Development settings
-		r.Run(":8080")
-	}
-}
-
-// Custom recovery middleware
-func CustomRecovery() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		defer func() {
-			if err := recover(); err != nil {
-				c.Header("Content-Type", "application/json")
-				c.JSON(500, gin.H{
-					"error": "Internal Server Error",
-				})
-			}
-		}()
-		c.Next()
+		if err := r.Run(":" + port); err != nil {
+			fmt.Printf("Failed to start server: %v\n", err)
+			os.Exit(1)
+		}
 	}
 }
