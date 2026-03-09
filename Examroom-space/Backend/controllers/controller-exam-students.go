@@ -38,7 +38,6 @@ func (ctl *Controller) getSeatPlan(roomID string) (*SeatPlan, error) {
 	var oddJSON, evenJSON []byte
 	var extra int
 
-	// ✅ ดึงผังจาก room_seat_plan (แทน hardcode)
 	err := ctl.SelectService.DB.QueryRow(`
 		SELECT odd_pattern, even_pattern, COALESCE(extra_row_size, 10)
 		FROM public.room_seat_plan
@@ -68,7 +67,6 @@ func (ctl *Controller) getSeatPlan(roomID string) (*SeatPlan, error) {
 		extra = 10
 	}
 
-	// ถ้าทั้งคู่ยังว่าง ถือว่าไม่มีผังจริง
 	if len(odd) == 0 && len(even) == 0 {
 		return nil, fmt.Errorf("ห้องนี้ยังไม่ได้ตั้งผังที่นั่ง (room_seat_plan) กรุณาตั้งค่าผังก่อน")
 	}
@@ -84,14 +82,13 @@ func (ctl *Controller) getSeatPlan(roomID string) (*SeatPlan, error) {
 func (ctl *Controller) ImportStudents(c *gin.Context) {
 	idConfig, _ := strconv.Atoi(c.PostForm("id_config"))
 	roomID := strings.TrimSpace(c.PostForm("room_id"))
-	courseFallback := strings.TrimSpace(c.PostForm("course")) // ใช้แทน ถ้า Excel ไม่มี/ว่าง
+	courseFallback := strings.TrimSpace(c.PostForm("course"))
 
 	if roomID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "room_id missing"})
 		return
 	}
 
-	// ถ้าไม่ได้ส่ง id_config มา ให้ดึง config ปัจจุบันมาแทน
 	if idConfig == 0 {
 		cur, err := ctl.SelectService.GetCurrentIDConfig()
 		if err != nil {
@@ -101,13 +98,11 @@ func (ctl *Controller) ImportStudents(c *gin.Context) {
 		idConfig = cur
 	}
 
-	// ✅ เช็คว่าห้องนี้มีผังที่นั่งใน DB ไหม (แทน hardcode R001-R005)
 	if _, err := ctl.getSeatPlan(roomID); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": err.Error()})
 		return
 	}
 
-	// รองรับทั้ง "file" และของเก่า "SigStd"
 	fh, err := c.FormFile("file")
 	if err != nil {
 		fh, err = c.FormFile("SigStd")
@@ -129,7 +124,6 @@ func (ctl *Controller) ImportStudents(c *gin.Context) {
 		return
 	}
 
-	// อ่าน Excel (ยอมรับกรณีไม่มีคอลัมน์ Course โดยใช้ courseFallback)
 	rows, count, warn, err := parseExcelToStudents(buf, courseFallback)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": err.Error()})
@@ -146,7 +140,6 @@ func (ctl *Controller) ImportStudents(c *gin.Context) {
 		return
 	}
 
-	// ตอบ 200 เสมอ + แนบคำเตือนถ้ามี
 	c.JSON(http.StatusOK, gin.H{"success": true, "count": count, "warning": warn})
 }
 
@@ -163,7 +156,6 @@ func (ctl *Controller) GetStudents(c *gin.Context) {
 		return
 	}
 
-	// ถ้าไม่ได้ส่ง id_config มา ให้ดึง config ปัจจุบันมาแทน
 	if idConfig == 0 {
 		cur, err := ctl.SelectService.GetCurrentIDConfig()
 		if err != nil {
@@ -173,7 +165,6 @@ func (ctl *Controller) GetStudents(c *gin.Context) {
 		idConfig = cur
 	}
 
-	// ✅ โหลดผังจาก DB (ถ้าไม่มีผัง -> ไม่ให้คำนวณ)
 	plan, err := ctl.getSeatPlan(roomID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": err.Error()})
@@ -182,14 +173,12 @@ func (ctl *Controller) GetStudents(c *gin.Context) {
 
 	var list []insertservice.StudentRow
 
-	// 1) ถ้ามี course -> ลอง exact ก่อน
 	if course != "" {
 		list, err = ctl.Insertservice.ListExamStudentsExact(c, idConfig, roomID, course)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": err.Error()})
 			return
 		}
-		// 2) ว่าง -> ลอง ILIKE
 		if len(list) == 0 {
 			list, err = ctl.Insertservice.ListExamStudentsILike(c, idConfig, roomID, "%"+course+"%")
 			if err != nil {
@@ -198,7 +187,6 @@ func (ctl *Controller) GetStudents(c *gin.Context) {
 			}
 		}
 	} else {
-		// 3) ไม่ส่ง course -> ดึงทุกวิชาในห้องนั้น
 		list, err = ctl.Insertservice.ListExamStudentsAll(c, idConfig, roomID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": err.Error()})
@@ -206,11 +194,12 @@ func (ctl *Controller) GetStudents(c *gin.Context) {
 		}
 	}
 
-	// ✅ เติมเลขแถวจาก “ผังใน DB”
-	list = ensureSeatMappingWithPlan(list, plan)
+	// ✅ แก้ตรงนี้: จัดที่นั่งตาม mode ตั้งแต่แรก
+	list = ensureSeatMappingWithPlan(list, plan, mode, custom)
 
-	// กรองตามโหมดแถว
+	// applySelection เหลือไว้เพื่อ grouped + กันพลาด
 	filtered, grouped := applySelection(list, mode, custom)
+
 	c.JSON(http.StatusOK, gin.H{
 		"success":  true,
 		"students": filtered,
@@ -229,7 +218,6 @@ func parseExcelToStudents(file []byte, courseFallback string) ([]insertservice.S
 	}
 	defer f.Close()
 
-	// ใช้ชีทแรก
 	sheet := f.WorkBook.Sheets.Sheet[0].Name
 	rs, err := f.GetRows(sheet)
 	if err != nil {
@@ -239,7 +227,6 @@ func parseExcelToStudents(file []byte, courseFallback string) ([]insertservice.S
 		return nil, 0, "", fmt.Errorf("empty sheet")
 	}
 
-	// map หัวคอลัมน์ (case-insensitive)
 	header := rs[0]
 	col := func(name string) int {
 		n := strings.ToLower(strings.TrimSpace(name))
@@ -309,8 +296,7 @@ func parseExcelToStudents(file []byte, courseFallback string) ([]insertservice.S
    3) SEAT MAPPING (จาก DB plan)
    ========================= */
 
-func ensureSeatMappingWithPlan(list []insertservice.StudentRow, plan *SeatPlan) []insertservice.StudentRow {
-	// เรียงให้คงที่ก่อน (สูตรอิงลำดับ)
+func ensureSeatMappingWithPlan(list []insertservice.StudentRow, plan *SeatPlan, mode, custom string) []insertservice.StudentRow {
 	sort.SliceStable(list, func(i, j int) bool {
 		if list[i].StudentID != list[j].StudentID {
 			return list[i].StudentID < list[j].StudentID
@@ -319,7 +305,7 @@ func ensureSeatMappingWithPlan(list []insertservice.StudentRow, plan *SeatPlan) 
 	})
 
 	for i := range list {
-		label := CalSeatFromPlan(plan, i+1, "all") // index เริ่ม 1
+		label := CalSeatFromPlan(plan, i+1, mode, custom) // ✅ ใช้ mode จริง
 		label = strings.TrimSpace(label)
 		if label == "" || strings.Contains(label, "ไม่พบ") {
 			list[i].SeatNo = ""
@@ -350,7 +336,7 @@ func applySelection(list []insertservice.StudentRow, mode, custom string) ([]ins
 		n, _ := strconv.Atoi(m)
 		return n, strings.Contains(seat, "เสริม")
 	}
-	// "1-5,8,12-14" -> set
+
 	toSet := func(spec string) map[int]bool {
 		set := map[int]bool{}
 		if strings.TrimSpace(spec) == "" {
@@ -382,14 +368,15 @@ func applySelection(list []insertservice.StudentRow, mode, custom string) ([]ins
 		}
 		return set
 	}
-	want := toSet(custom)
 
+	want := toSet(custom)
 	filtered := make([]insertservice.StudentRow, 0, len(list))
 	byRow := map[int][]string{}
 
 	for _, s := range list {
 		row, extra := parseRow(s.SeatNo)
 		pass := false
+
 		switch mode {
 		case "", "all":
 			pass = true
@@ -406,6 +393,7 @@ func applySelection(list []insertservice.StudentRow, mode, custom string) ([]ins
 		default:
 			pass = true
 		}
+
 		if pass {
 			filtered = append(filtered, s)
 			if row > 0 {
@@ -413,6 +401,7 @@ func applySelection(list []insertservice.StudentRow, mode, custom string) ([]ins
 			}
 		}
 	}
+
 	rows := make([]int, 0, len(byRow))
 	for k := range byRow {
 		rows = append(rows, k)
@@ -425,9 +414,16 @@ func applySelection(list []insertservice.StudentRow, mode, custom string) ([]ins
 		rng := ""
 		if len(ids) >= 2 {
 			rng = fmt.Sprintf("%s - %s", ids[0], ids[len(ids)-1])
+		} else if len(ids) == 1 {
+			rng = ids[0]
 		}
-		grouped = append(grouped, GroupRow{Row: r, Count: len(ids), Range: rng})
+		grouped = append(grouped, GroupRow{
+			Row:   r,
+			Count: len(ids),
+			Range: rng,
+		})
 	}
+
 	return filtered, grouped
 }
 
@@ -435,43 +431,18 @@ func applySelection(list []insertservice.StudentRow, mode, custom string) ([]ins
    5) สูตรคำนวณแถว (ใช้ plan จาก DB)
    ========================= */
 
-func CalSeatFromPlan(plan *SeatPlan, x int, rowFilterParam string) string {
+func CalSeatFromPlan(plan *SeatPlan, x int, mode, custom string) string {
 	if plan == nil {
 		return "ไม่พบข้อมูลที่นั่ง"
 	}
 
-	resultX1 := plan.Odd
-	resultX2 := plan.Even
-	extraRowSize := plan.ExtraRowSize
+	seats, rows, extraRowSize := buildSeatsByMode(plan, mode, custom)
 	if extraRowSize <= 0 {
 		extraRowSize = 10
 	}
 
-	var seats []int
-	rowType, err := strconv.Atoi(rowFilterParam)
-	if err != nil {
-		rowType = 0
-	}
-
-	switch rowFilterParam {
-	case "odd":
-		seats = resultX1
-	case "even":
-		seats = resultX2
-	case "all", "":
-		seats = mergeSeats(resultX1, resultX2)
-	default:
-		// legacy: ส่งเป็นตัวเลขเริ่มต้น slice
-		merged := mergeSeats(resultX1, resultX2)
-		if rowType >= 0 && rowType < len(merged) {
-			seats = merged[rowType:]
-		} else {
-			seats = merged
-		}
-	}
-
-	if len(seats) == 0 {
-		log.Println("No seat data available")
+	if len(seats) == 0 || len(rows) == 0 {
+		log.Println("No seat data available for mode:", mode)
 		return "ไม่พบข้อมูลที่นั่ง"
 	}
 
@@ -479,18 +450,128 @@ func CalSeatFromPlan(plan *SeatPlan, x int, rowFilterParam string) string {
 
 	for i, num := range cumulative {
 		if num >= x {
-			if rowType != 0 {
-				return "แถว " + strconv.Itoa((i+1)+(rowType-1))
-			}
-			return "แถว " + strconv.Itoa(i+1)
+			return "แถว " + strconv.Itoa(rows[i])
 		}
 	}
 
-	// Extra row case
 	total := cumulative[len(cumulative)-1]
 	over := x - total
 	extraRow := (over-1)/extraRowSize + 1
 	return "แถวเสริม " + strconv.Itoa(extraRow)
+}
+
+func buildSeatsByMode(plan *SeatPlan, mode, custom string) ([]int, []int, int) {
+	extraRowSize := plan.ExtraRowSize
+	if extraRowSize <= 0 {
+		extraRowSize = 10
+	}
+
+	maxLen := len(plan.Odd)
+	if len(plan.Even) > maxLen {
+		maxLen = len(plan.Even)
+	}
+
+	customRows := parseCustomRows(custom)
+
+	seats := []int{}
+	rows := []int{}
+
+	for i := 0; i < maxLen; i++ {
+		rowNo := i + 1
+
+		oddCap := 0
+		evenCap := 0
+		if i < len(plan.Odd) {
+			oddCap = plan.Odd[i]
+		}
+		if i < len(plan.Even) {
+			evenCap = plan.Even[i]
+		}
+
+		rowCap := oddCap
+		if rowCap == 0 {
+			rowCap = evenCap
+		}
+
+		if rowCap <= 0 {
+			continue
+		}
+
+		include := false
+		switch mode {
+		case "", "all":
+			include = true
+		case "odd":
+			include = rowNo%2 == 1
+		case "even":
+			include = rowNo%2 == 0
+		case "custom":
+			if len(customRows) == 0 {
+				include = true
+			} else {
+				include = containsInt(customRows, rowNo)
+			}
+		default:
+			include = true
+		}
+
+		if include {
+			seats = append(seats, rowCap)
+			rows = append(rows, rowNo)
+		}
+	}
+
+	return seats, rows, extraRowSize
+}
+
+func parseCustomRows(spec string) []int {
+	set := map[int]bool{}
+	spec = strings.TrimSpace(spec)
+	if spec == "" {
+		return []int{}
+	}
+
+	for _, p := range strings.Split(spec, ",") {
+		t := strings.TrimSpace(p)
+		if t == "" {
+			continue
+		}
+
+		if strings.Contains(t, "-") {
+			ab := strings.SplitN(t, "-", 2)
+			a, _ := strconv.Atoi(strings.TrimSpace(ab[0]))
+			b, _ := strconv.Atoi(strings.TrimSpace(ab[1]))
+			if a > b {
+				a, b = b, a
+			}
+			for i := a; i <= b; i++ {
+				if i > 0 {
+					set[i] = true
+				}
+			}
+		} else {
+			n, _ := strconv.Atoi(t)
+			if n > 0 {
+				set[n] = true
+			}
+		}
+	}
+
+	out := make([]int, 0, len(set))
+	for n := range set {
+		out = append(out, n)
+	}
+	sort.Ints(out)
+	return out
+}
+
+func containsInt(arr []int, target int) bool {
+	for _, v := range arr {
+		if v == target {
+			return true
+		}
+	}
+	return false
 }
 
 func cumulativeSum(arr []int) []int {
@@ -503,6 +584,7 @@ func cumulativeSum(arr []int) []int {
 	return result
 }
 
+// คงไว้เผื่อส่วนอื่นของระบบยังเรียกใช้
 func mergeSeats(x1, x2 []int) []int {
 	merged := []int{}
 	length := len(x1)

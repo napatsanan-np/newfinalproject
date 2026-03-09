@@ -70,65 +70,106 @@ const AvailableRooms = () => {
 
   // ===== ประเภทห้อง =====
   const roomTypes = ["ห้องบรรยาย(สโลป)", "ห้องบรรยาย(ปกติ)", "ห้องปฏิบัติการ"];
-
   const isSlopeType = (v) => String(v || "").trim() === "ห้องบรรยาย(สโลป)";
 
-  // รับได้ 2 แบบ: JSON array หรือ "10,0,10,0"
-  const parsePattern = (raw) => {
-    const s = String(raw || "").trim();
-    if (!s) return null;
-
-    // ถ้าเป็น JSON array
-    if (s.startsWith("[") && s.endsWith("]")) {
-      let arr;
-      try {
-        arr = JSON.parse(s);
-      } catch {
-        throw new Error("รูปแบบผังต้องเป็น JSON array เช่น [10,0,10,0,12]");
-      }
-      if (!Array.isArray(arr)) {
-        throw new Error("รูปแบบผังต้องเป็น JSON array เช่น [10,0,10,0,12]");
-      }
-      const out = arr.map((x) => Number(x));
-      if (out.some((n) => !Number.isFinite(n) || n < 0)) {
-        throw new Error("ผังต้องเป็นตัวเลข >= 0 เท่านั้น");
-      }
-      return out.map((n) => Math.trunc(n));
-    }
-
-    // ถ้าเป็น comma-separated
-    const parts = s.split(",").map((x) => x.trim()).filter(Boolean);
-    const out = parts.map((x) => Number(x));
-    if (!out.length) return null;
-    if (out.some((n) => !Number.isFinite(n) || n < 0)) {
-      throw new Error("ผังต้องเป็นตัวเลข >= 0 เท่านั้น");
-    }
-    return out.map((n) => Math.trunc(n));
+  // ===== helpers =====
+  const toInt = (v) => {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return null;
+    return Math.trunc(n);
   };
 
-  const seatPlanSectionHTML = (initOdd = "", initEven = "", initExtra = 10) => `
-    <div id="seatplan_wrap" style="display:none; text-align:left; margin-top:12px; padding:12px; border:1px dashed #d9d9d9; border-radius:8px;">
-      <div style="font-weight:600; margin-bottom:8px;">ตั้งค่าผังที่นั่ง (เฉพาะห้องบรรยายสโลป)</div>
-      <div style="font-size:12px; color:#6b7280; margin-bottom:10px;">
-        ใส่เป็น JSON array เช่น <code>[10,0,10,0,12]</code> (0 คือแถวที่ไม่ใช้) หรือใส่แบบคอมม่า <code>10,0,10,0,12</code>
-      </div>
+  // ===== Seat Plan API (NEW for option B) =====
+  const fetchSeatPlanByRoomId = async (roomId) => {
+    const res = await fetch(`${API_URL}/rooms/${roomId}/seat-plan`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
 
-      <div class="mb-3">
-        <label for="odd_pattern" class="form-label">แถวคี่ (odd_pattern)</label>
-        <textarea id="odd_pattern" class="swal2-textarea" placeholder='เช่น [10,0,10,0,12]' style="min-height:80px;">${initOdd}</textarea>
-      </div>
+    if (!res.ok) {
+      if (res.status === 404) return null;
+      throw new Error("Failed to fetch seat plan");
+    }
 
-      <div class="mb-3">
-        <label for="even_pattern" class="form-label">แถวคู่ (even_pattern)</label>
-        <textarea id="even_pattern" class="swal2-textarea" placeholder='เช่น [0,10,0,12,0,12]' style="min-height:80px;">${initEven}</textarea>
-      </div>
+    const text = await res.text();
+    if (!text) return null;
 
-      <div class="mb-3">
-        <label for="extra_row_size" class="form-label">จำนวนที่นั่งแถวเสริม (extra_row_size)</label>
-        <input id="extra_row_size" type="number" class="swal2-input" value="${initExtra}" placeholder="เช่น 10">
-      </div>
-    </div>
-  `;
+    try {
+      return JSON.parse(text);
+    } catch {
+      return null;
+    }
+  };
+
+  // ✅ NEW: upsert seat plan (PUT /rooms/:id/seat-plan)
+  const upsertSeatPlanByRoomId = async (roomId, seatPlan) => {
+    const res = await fetch(`${API_URL}/rooms/${roomId}/seat-plan`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      // body ต้องเป็น { odd_pattern, even_pattern, extra_row_size }
+      body: JSON.stringify(seatPlan),
+    });
+
+    if (!res.ok) {
+      const msg = await res.text().catch(() => "");
+      throw new Error(msg || "Failed to update seat plan");
+    }
+  };
+
+  // ✅ NEW: delete seat plan (DELETE /rooms/:id/seat-plan)
+  const deleteSeatPlanByRoomId = async (roomId) => {
+    const res = await fetch(`${API_URL}/rooms/${roomId}/seat-plan`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    // ถ้า backend คืน 404 ก็ถือว่า "ไม่มีผัง" อยู่แล้ว
+    if (!res.ok && res.status !== 404) {
+      const msg = await res.text().catch(() => "");
+      throw new Error(msg || "Failed to delete seat plan");
+    }
+  };
+
+  // แปลง seat_plan odd/even แบบ 0 สลับ -> rows[] เพื่อ prefill ตอน Edit
+  const buildRowsFromSeatPlan = (seatPlan) => {
+    const odd = Array.isArray(seatPlan?.odd_pattern) ? seatPlan.odd_pattern : [];
+    const even = Array.isArray(seatPlan?.even_pattern) ? seatPlan.even_pattern : [];
+    const len = Math.max(odd.length, even.length);
+    const rows = [];
+
+    for (let i = 0; i < len; i++) {
+      const o = Number(odd[i]) || 0;
+      const e = Number(even[i]) || 0;
+      rows.push(o > 0 ? o : e);
+    }
+    return rows;
+  };
+
+  // split rows[] -> odd/even แบบ 0 สลับ ความยาวเท่าจำนวนแถว
+  const splitRowsToOddEven = (rows) => {
+    const odd = [];
+    const even = [];
+    rows.forEach((seat, idx) => {
+      const rowNo = idx + 1;
+      if (rowNo % 2 === 1) {
+        odd.push(seat);
+        even.push(0);
+      } else {
+        odd.push(0);
+        even.push(seat);
+      }
+    });
+    return { odd, even };
+  };
 
   const toggleSeatPlanUI = () => {
     const sel = document.getElementById("room_type");
@@ -136,6 +177,89 @@ const AvailableRooms = () => {
     if (!sel || !wrap) return;
     wrap.style.display = isSlopeType(sel.value) ? "block" : "none";
   };
+
+  const renderRowInputs = (count, initRows = []) => {
+    const wrap = document.getElementById("row_inputs");
+    if (!wrap) return;
+
+    const c = Math.max(0, Math.min(200, Number(count) || 0));
+    if (!c) {
+      wrap.innerHTML = "";
+      return;
+    }
+
+    let html = "";
+    for (let i = 1; i <= c; i++) {
+      const initVal = initRows[i - 1];
+      html += `
+        <div class="mb-2" style="display:flex; align-items:center; gap:10px;">
+          <div style="width:110px; font-weight:600;">แถวที่ ${i} :</div>
+          <span style="font-weight:700;">[</span>
+          <input
+            type="number"
+            class="swal2-input seat-row-input"
+            data-row="${i}"
+            style="margin:0; height:36px; width:120px;"
+            placeholder="0"
+            value="${initVal ?? ""}"
+          />
+          <span style="font-weight:700;">]</span>
+        </div>
+      `;
+    }
+    wrap.innerHTML = html;
+  };
+
+  const readRowsFromDOM = () => {
+    const countRaw = document.getElementById("row_count")?.value;
+    const count = toInt(countRaw);
+
+    if (!Number.isFinite(count) || count <= 0) {
+      throw new Error("กรุณากรอกจำนวนแถวให้ถูกต้อง (ต้องเป็นตัวเลข > 0)");
+    }
+
+    const inputs = Array.from(document.querySelectorAll(".seat-row-input"));
+    inputs.sort((a, b) => Number(a.dataset.row) - Number(b.dataset.row));
+
+    if (inputs.length !== count) {
+      throw new Error("จำนวนช่องแถวไม่ตรงกับจำนวนแถว (ลองปิดแล้วเปิดใหม่)");
+    }
+
+    const rows = inputs.map((el, idx) => {
+      const raw = el.value;
+      if (raw == null || String(raw).trim() === "") {
+        throw new Error(`กรุณากรอกจำนวนที่นั่งของแถวที่ ${idx + 1} (ถ้าไม่ใช้ให้ใส่ 0)`);
+      }
+      const seat = toInt(raw);
+      if (!Number.isFinite(seat) || seat < 0) {
+        throw new Error(`แถวที่ ${idx + 1} ต้องเป็นตัวเลข >= 0 เท่านั้น`);
+      }
+      return seat;
+    });
+
+    return rows;
+  };
+
+  const seatPlanSectionHTML = (initRowCount = "", initRows = [], initExtra = 10) => `
+    <div id="seatplan_wrap" style="display:none; text-align:left; margin-top:12px; padding:12px; border:1px dashed #d9d9d9; border-radius:8px;">
+      <div style="font-weight:600; margin-bottom:8px;">ตั้งค่าผังที่นั่ง (เฉพาะห้องบรรยายสโลป)</div>
+      <div style="font-size:12px; color:#6b7280; margin-bottom:10px;">
+        กรอกจำนวนที่นั่ง "ตามลำดับแถว" เช่น แถวที่ 1=10, แถวที่ 2=10, แถวที่ 3=12 (ถ้าไม่ใช้แถวนั้นให้ใส่ 0)
+      </div>
+
+      <div class="mb-3">
+        <label for="row_count" class="form-label">จำนวนแถว</label>
+        <input id="row_count" type="number" class="swal2-input" value="${initRowCount}" placeholder="เช่น 7">
+      </div>
+
+      <div id="row_inputs" class="mb-3"></div>
+
+      <div class="mb-3">
+        <label for="extra_row_size" class="form-label">จำนวนที่นั่งแถวเสริม</label>
+        <input id="extra_row_size" type="number" class="swal2-input" value="${initExtra}" placeholder="เช่น 10">
+      </div>
+    </div>
+  `;
 
   const handleAddRoom = () => {
     Swal.fire({
@@ -159,7 +283,7 @@ const AvailableRooms = () => {
           <input id="capacity" type="number" class="swal2-input" placeholder="จำนวนที่นั่ง">
         </div>
 
-        ${seatPlanSectionHTML("", "", 10)}
+        ${seatPlanSectionHTML("", [], 10)}
       `,
       focusConfirm: false,
       showCancelButton: true,
@@ -171,6 +295,13 @@ const AvailableRooms = () => {
         const sel = document.getElementById("room_type");
         if (sel) sel.addEventListener("change", toggleSeatPlanUI);
         toggleSeatPlanUI();
+
+        const rowCountEl = document.getElementById("row_count");
+        if (rowCountEl) {
+          rowCountEl.addEventListener("input", () => {
+            renderRowInputs(rowCountEl.value, []);
+          });
+        }
       },
       preConfirm: () => {
         const roomName = document.getElementById("room_name")?.value;
@@ -188,21 +319,14 @@ const AvailableRooms = () => {
           capacity: parseInt(capacity, 10),
         };
 
-        // ถ้าเป็นสโลป ให้ต้องมีผัง
         if (isSlopeType(roomType)) {
           try {
-            const oddRaw = document.getElementById("odd_pattern")?.value;
-            const evenRaw = document.getElementById("even_pattern")?.value;
             const extraRaw = document.getElementById("extra_row_size")?.value;
 
-            const odd = parsePattern(oddRaw);
-            const even = parsePattern(evenRaw);
-            const extra = Number(extraRaw);
+            const rows = readRowsFromDOM();
+            const { odd, even } = splitRowsToOddEven(rows);
 
-            if (!odd || !even) {
-              Swal.showValidationMessage("กรุณากรอกผังแถวคี่/แถวคู่ ให้ครบ");
-              return false;
-            }
+            const extra = Number(extraRaw);
             if (!Number.isFinite(extra) || extra <= 0) {
               Swal.showValidationMessage("extra_row_size ต้องเป็นตัวเลข > 0");
               return false;
@@ -258,14 +382,28 @@ const AvailableRooms = () => {
     }
   };
 
-  const handleEditRoom = (room) => {
-    const initOdd = room?.seat_plan?.odd_pattern
-      ? JSON.stringify(room.seat_plan.odd_pattern)
-      : "";
-    const initEven = room?.seat_plan?.even_pattern
-      ? JSON.stringify(room.seat_plan.even_pattern)
-      : "";
-    const initExtra = Number(room?.seat_plan?.extra_row_size || 10);
+  // ทำให้เป็น async เพื่อดึง seat plan ก่อนเปิด modal
+  const handleEditRoom = async (room) => {
+    let seatPlan = null;
+
+    if (isSlopeType(room.room_type)) {
+      try {
+        seatPlan = await fetchSeatPlanByRoomId(room.room_id);
+      } catch (e) {
+        console.error("fetchSeatPlanByRoomId error:", e);
+        Swal.fire({
+          icon: "error",
+          title: "เกิดข้อผิดพลาด",
+          text: "ดึงผังที่นั่งไม่สำเร็จ",
+          confirmButtonColor: "#dc3545",
+        });
+        return;
+      }
+    }
+
+    const initRows = seatPlan ? buildRowsFromSeatPlan(seatPlan) : [];
+    const initRowCount = initRows.length ? String(initRows.length) : "";
+    const initExtra = Number(seatPlan?.extra_row_size || 10);
 
     Swal.fire({
       title: "แก้ไขข้อมูลห้อง",
@@ -293,7 +431,7 @@ const AvailableRooms = () => {
           <input id="capacity" type="number" class="swal2-input" value="${room.capacity ?? ""}" placeholder="จำนวนที่นั่ง">
         </div>
 
-        ${seatPlanSectionHTML(initOdd, initEven, initExtra)}
+        ${seatPlanSectionHTML(initRowCount, initRows, initExtra)}
       `,
       focusConfirm: false,
       showCancelButton: true,
@@ -304,7 +442,18 @@ const AvailableRooms = () => {
       didOpen: () => {
         const sel = document.getElementById("room_type");
         if (sel) sel.addEventListener("change", toggleSeatPlanUI);
-        toggleSeatPlanUI(); // โชว์/ซ่อนตามค่าเริ่มต้น
+
+        toggleSeatPlanUI();
+
+        const rowCountEl = document.getElementById("row_count");
+        if (rowCountEl && isSlopeType(sel?.value)) {
+          if (String(rowCountEl.value || "").trim() !== "") {
+            renderRowInputs(rowCountEl.value, initRows);
+          }
+          rowCountEl.addEventListener("input", () => {
+            renderRowInputs(rowCountEl.value, initRows);
+          });
+        }
       },
       preConfirm: () => {
         const roomName = document.getElementById("room_name")?.value;
@@ -323,21 +472,14 @@ const AvailableRooms = () => {
           capacity: parseInt(capacity, 10),
         };
 
-        // สโลป => ต้องมีผัง / ไม่ใช่สโลป => ล้างผังได้
         if (isSlopeType(roomType)) {
           try {
-            const oddRaw = document.getElementById("odd_pattern")?.value;
-            const evenRaw = document.getElementById("even_pattern")?.value;
             const extraRaw = document.getElementById("extra_row_size")?.value;
 
-            const odd = parsePattern(oddRaw);
-            const even = parsePattern(evenRaw);
-            const extra = Number(extraRaw);
+            const rows = readRowsFromDOM();
+            const { odd, even } = splitRowsToOddEven(rows);
 
-            if (!odd || !even) {
-              Swal.showValidationMessage("กรุณากรอกผังแถวคี่/แถวคู่ ให้ครบ");
-              return false;
-            }
+            const extra = Number(extraRaw);
             if (!Number.isFinite(extra) || extra <= 0) {
               Swal.showValidationMessage("extra_row_size ต้องเป็นตัวเลข > 0");
               return false;
@@ -353,7 +495,6 @@ const AvailableRooms = () => {
             return false;
           }
         } else {
-          // ไม่ใช่สโลป: ส่ง seat_plan เป็น null เพื่อให้ backend ตัด/ล้างได้ (ถ้า backend รองรับ)
           payload.seat_plan = null;
         }
 
@@ -364,18 +505,38 @@ const AvailableRooms = () => {
     });
   };
 
+  // ✅ CHANGED: อัปเดต rooms ก่อน แล้วค่อย PUT/DELETE seat-plan ตามเส้นใหม่
   const updateRoom = async (roomData) => {
     try {
+      // 1) update ตาราง rooms เท่านั้น (ไม่ส่ง seat_plan ไปเส้นนี้)
+      const roomOnly = {
+        room_id: roomData.room_id,
+        room_name: roomData.room_name,
+        room_type: roomData.room_type,
+        capacity: roomData.capacity,
+      };
+
       const response = await fetch(`${API_URL}/rooms/${roomData.room_id}`, {
         method: "PUT",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(roomData),
+        body: JSON.stringify(roomOnly),
       });
 
       if (!response.ok) throw new Error("Failed to update room");
+
+      // 2) update/delete seat plan ตามประเภทห้อง
+      if (isSlopeType(roomData.room_type)) {
+        if (!roomData.seat_plan) {
+          throw new Error("seat_plan is required for slope room");
+        }
+        await upsertSeatPlanByRoomId(roomData.room_id, roomData.seat_plan);
+      } else {
+        // ถ้าไม่ใช่สโลป ให้ล้างผัง (ถ้าไม่มีก็ไม่เป็นไร)
+        await deleteSeatPlanByRoomId(roomData.room_id);
+      }
 
       Swal.fire({
         icon: "success",
@@ -390,7 +551,7 @@ const AvailableRooms = () => {
       Swal.fire({
         icon: "error",
         title: "เกิดข้อผิดพลาด",
-        text: "ไม่สามารถแก้ไขข้อมูลห้องได้",
+        text: error?.message || "ไม่สามารถแก้ไขข้อมูลห้องได้",
         confirmButtonColor: "#dc3545",
       });
     }
@@ -413,6 +574,14 @@ const AvailableRooms = () => {
 
   const deleteRoom = async (room_id) => {
     try {
+      // (ไม่บังคับ) ล้าง seat plan ก่อน เผื่อมี FK/constraint
+      try {
+        await deleteSeatPlanByRoomId(room_id);
+      } catch (e) {
+        // ไม่ให้ล้มทั้ง flow ถ้าลบผังไม่ได้/ไม่มี
+        console.warn("deleteSeatPlanByRoomId warning:", e);
+      }
+
       const response = await fetch(`${API_URL}/rooms/${room_id}`, {
         method: "DELETE",
         headers: {
@@ -544,28 +713,16 @@ const AvailableRooms = () => {
                     <thead className="table-light">
                       <tr>
                         <th style={{ width: "80px" }}>ลำดับ</th>
-                        <th
-                          style={{ cursor: "pointer" }}
-                          onClick={() => handleSort("room_id")}
-                        >
+                        <th style={{ cursor: "pointer" }} onClick={() => handleSort("room_id")}>
                           รหัสห้อง {sortIcon("room_id")}
                         </th>
-                        <th
-                          style={{ cursor: "pointer" }}
-                          onClick={() => handleSort("room_name")}
-                        >
+                        <th style={{ cursor: "pointer" }} onClick={() => handleSort("room_name")}>
                           ชื่อห้อง {sortIcon("room_name")}
                         </th>
-                        <th
-                          style={{ cursor: "pointer" }}
-                          onClick={() => handleSort("room_type")}
-                        >
+                        <th style={{ cursor: "pointer" }} onClick={() => handleSort("room_type")}>
                           ประเภทห้อง {sortIcon("room_type")}
                         </th>
-                        <th
-                          style={{ cursor: "pointer" }}
-                          onClick={() => handleSort("capacity")}
-                        >
+                        <th style={{ cursor: "pointer" }} onClick={() => handleSort("capacity")}>
                           ความจุ {sortIcon("capacity")}
                         </th>
                         <th style={{ width: "160px" }}>จัดการ</th>

@@ -377,7 +377,7 @@ const SearchResultsTable = ({ results }) => (
           <th>เวลาสอบ</th>
           <th>จำนวนชั่วโมง</th>
           <th>จำนวนนักศึกษา</th>
-          <th>อาจารย์ผู้สอน</th>
+          <th>กรรมการคุมสอบ</th>
           <th>สถานะการส่งข้อสอบ</th>
         </tr>
       </thead>

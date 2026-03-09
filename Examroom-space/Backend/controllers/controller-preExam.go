@@ -541,3 +541,76 @@ func (ctrl *Controller) GetRoomexamForEdit(c *gin.Context) {
 	c.JSON(http.StatusOK, data)
 }
 
+// GetRoomSeatPlan handles fetching seat plan for a room (slope room)
+// GET /api/rooms/:room_id/seat-plan
+func (ctrl *Controller) GetRoomSeatPlan(c *gin.Context) {
+	roomID := c.Param("room_id")
+	if strings.TrimSpace(roomID) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "room_id is required"})
+		return
+	}
+
+	seatPlan, err := ctrl.SelectService.GetRoomSeatPlanByRoomID(c.Request.Context(), roomID)
+	if err != nil {
+		// ถ้าไม่เจอ record ใน room_seat_plan → คืน null (ง่ายกับ frontend)
+		if strings.Contains(strings.ToLower(err.Error()), "not found") {
+			c.JSON(http.StatusOK, nil)
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// seatPlan เป็น struct/map ที่มี odd/even/extra
+	c.JSON(http.StatusOK, seatPlan)
+}
+
+// ============================
+// ROOM SEAT PLAN CONTROLLERS
+// ============================
+
+type SeatPlanPayload struct {
+	OddPattern    []int `json:"odd_pattern"`
+	EvenPattern   []int `json:"even_pattern"`
+	ExtraRowSize  int   `json:"extra_row_size"`
+}
+
+// PUT /api/rooms/:room_id/seat-plan  (upsert)
+func (c *Controller) UpsertRoomSeatPlan(ctx *gin.Context) {
+	roomID := ctx.Param("room_id")
+
+	var payload SeatPlanPayload
+	if err := ctx.ShouldBindJSON(&payload); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// validate ง่ายๆ
+	if len(payload.OddPattern) == 0 && len(payload.EvenPattern) == 0 {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "odd_pattern/even_pattern ห้ามว่าง"})
+		return
+	}
+	if payload.ExtraRowSize <= 0 {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "extra_row_size ต้อง > 0"})
+		return
+	}
+
+	if err := c.Updateservice.UpsertRoomSeatPlan(ctx.Request.Context(), roomID, payload.OddPattern, payload.EvenPattern, payload.ExtraRowSize); err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"message": "seat plan updated successfully"})
+}
+
+// DELETE /api/rooms/:room_id/seat-plan (ล้างผัง)
+func (c *Controller) DeleteRoomSeatPlan(ctx *gin.Context) {
+	roomID := ctx.Param("room_id")
+
+	if err := c.Updateservice.DeleteRoomSeatPlan(ctx.Request.Context(), roomID); err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"message": "seat plan deleted successfully"})
+}

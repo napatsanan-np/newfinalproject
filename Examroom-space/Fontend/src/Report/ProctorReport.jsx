@@ -1,23 +1,35 @@
-import React, { useState, useEffect } from 'react';
-import { Container, Card, Alert, Table, Row, Col } from 'react-bootstrap';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import Select from 'react-select';
-import SidebarMenu from '../Navbar/SidebarMenu';
-import './Proctor-report-styles.css';
+import React, { useState, useEffect } from "react";
+import { Container, Card, Alert, Table, Row, Col } from "react-bootstrap";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+import Select from "react-select";
+import SidebarMenu from "../Navbar/SidebarMenu";
+import "./Proctor-report-styles.css";
 
 const ProctorReport = () => {
   const [academicYear, setAcademicYear] = useState(null);
   const [semester, setSemester] = useState(null);
+  const [phase, setPhase] = useState(null);
+
   const [reportData, setReportData] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [selectedProctor, setSelectedProctor] = useState(null);
   const [academicYears, setAcademicYears] = useState([]);
   const [semesters, setSemesters] = useState([]);
-  const [filterDate, setFilterDate] = useState(null);
-  const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'asc' });
+  const [phases, setPhases] = useState([]);
 
-  // เพิ่ม roomMapping สำหรับแสดงชื่อห้องแทนรหัส
+  const [filterDate, setFilterDate] = useState(null);
+  const [sortConfig, setSortConfig] = useState({ key: "date", direction: "asc" });
+
   const roomMapping = {
     "-": "ไม่มีห้อง",
     R001: "ร.วท.1",
@@ -61,44 +73,58 @@ const ProctorReport = () => {
   useEffect(() => {
     const fetchConfigs = async () => {
       try {
-        const response = await fetch(localStorage.getItem("API") + '/select_data/exam_config', {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-            "Content-Type": "application/json",
-          },
-        });
+        const response = await fetch(
+          localStorage.getItem("API") + "/select_data/exam_config",
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
         const data = await response.json();
-        
-        const years = [...new Set(data.map(c => c.academic_year))].map(year => ({
-          value: year,
-          label: `ปีการศึกษา ${year}`
-        }));
-        const terms = [...new Set(data.map(c => c.semester))].map(term => ({
+
+        const years = [...new Set(data.map((c) => c.academic_year))].map(
+          (year) => ({
+            value: year,
+            label: `ปีการศึกษา ${year}`,
+          })
+        );
+        const terms = [...new Set(data.map((c) => c.semester))].map((term) => ({
           value: term,
-          label: term
+          label: term,
         }));
-        
+
+        const phaseList = [...new Set(data.map((c) => c.phase))]
+          .filter((p) => p !== null && p !== undefined && String(p).trim() !== "")
+          .map((p) => ({
+            value: p,
+            label: String(p),
+          }));
+
         setAcademicYears(years);
         setSemesters(terms);
+        setPhases(phaseList);
       } catch (err) {
-        setError('ไม่สามารถดึงข้อมูลการตั้งค่าได้');
+        setError("ไม่สามารถดึงข้อมูลการตั้งค่าได้");
       }
     };
-    
+
     fetchConfigs();
   }, []);
 
   const fetchReport = async () => {
-    if (!academicYear?.value || !semester?.value) return;
+    if (!academicYear?.value || !semester?.value || !phase?.value) return;
 
     setLoading(true);
     setError(null);
 
     try {
-      const url = selectedProctor 
-        ? `${localStorage.getItem("API")}/reports/proctor-stats/${academicYear.value}/${semester.value}/${selectedProctor.value}`
-        : `${localStorage.getItem("API")}/reports/proctor-stats/${academicYear.value}/${semester.value}`;
+      const url = selectedProctor
+        ? `${localStorage.getItem("API")}/reports/proctor-stats/${academicYear.value}/${semester.value}/${phase.value}/${selectedProctor.value}`
+        : `${localStorage.getItem("API")}/reports/proctor-stats/${academicYear.value}/${semester.value}/${phase.value}`;
 
       const response = await fetch(url, {
         method: "GET",
@@ -107,119 +133,134 @@ const ProctorReport = () => {
           "Content-Type": "application/json",
         },
       });
-      
+
       if (!response.ok) {
         if (response.status === 500) {
-          throw new Error(`ไม่พบข้อมูลการคุมสอบสำหรับปีการศึกษา ${academicYear.value} ภาคการศึกษา ${semester.value} กรุณาตรวจสอบว่ามีการตั้งค่าการสอบในช่วงเวลานี้หรือไม่`);
-        } else {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          throw new Error(
+            `ไม่พบข้อมูลการคุมสอบสำหรับปีการศึกษา ${academicYear.value} ภาคการศึกษา ${semester.value} (${phase.value}) กรุณาตรวจสอบว่ามีการตั้งค่าการสอบในช่วงเวลานี้หรือไม่`
+          );
         }
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
       setReportData(data);
     } catch (err) {
       setError(err.message);
+      setReportData(null);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (academicYear?.value && semester?.value) {
+    if (academicYear?.value && semester?.value && phase?.value) {
       fetchReport();
+    } else {
+      setReportData(null);
+      setSelectedProctor(null);
+      setFilterDate(null);
     }
-  }, [academicYear, semester, selectedProctor]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [academicYear, semester, phase, selectedProctor]);
 
   const calculateSummary = () => {
     if (!reportData?.proctors) return null;
 
-    const summary = {
-      totalProctors: reportData.proctors.length,
-      totalAssignments: reportData.proctors.reduce((sum, p) => sum + p.total_assignments, 0),
-      averageAssignments: (reportData.proctors.reduce((sum, p) => sum + p.total_assignments, 0) / reportData.proctors.length).toFixed(2)
-    };
+    const totalAssignments = reportData.proctors.reduce(
+      (sum, p) => sum + p.total_assignments,
+      0
+    );
 
-    return summary;
+    return {
+      totalProctors: reportData.proctors.length,
+      totalAssignments,
+      averageAssignments:
+        reportData.proctors.length > 0
+          ? (totalAssignments / reportData.proctors.length).toFixed(2)
+          : "0.00",
+    };
   };
 
   const getChartData = () => {
     if (!reportData?.proctors) return [];
 
-    const dates = [...new Set(reportData.proctors.flatMap(p => 
-      p.assignments.map(a => a.date)
-    ))].sort();
+    const dates = [
+      ...new Set(
+        reportData.proctors.flatMap((p) => p.assignments.map((a) => a.date))
+      ),
+    ].sort();
 
-    return dates.map(date => {
-      const assignmentsOnDate = reportData.proctors.flatMap(p => 
-        p.assignments.filter(a => a.date === date)
+    return dates.map((date) => {
+      const assignmentsOnDate = reportData.proctors.flatMap((p) =>
+        p.assignments.filter((a) => a.date === date)
       );
 
       return {
         date,
-        'จำนวนการคุมสอบ': assignmentsOnDate.length
+        "จำนวนการคุมสอบ": assignmentsOnDate.length,
       };
     });
   };
 
   const getDates = () => {
     if (!reportData?.proctors) return [];
-    
-    return [...new Set(reportData.proctors.flatMap(p => 
-      p.assignments.map(a => a.date)
-    ))].sort();
+    return [
+      ...new Set(
+        reportData.proctors.flatMap((p) => p.assignments.map((a) => a.date))
+      ),
+    ].sort();
   };
 
   const sortAssignments = (assignments, proctor) => {
     return [...assignments].sort((a, b) => {
       let comparison = 0;
-      const direction = sortConfig.direction === 'asc' ? 1 : -1;
+      const direction = sortConfig.direction === "asc" ? 1 : -1;
 
       switch (sortConfig.key) {
-        case 'proctor':
-          comparison = proctor.full_name.localeCompare(proctor.full_name); // จะถูกเรียงในระดับ outer loop
+        case "proctor":
+          comparison = proctor.full_name.localeCompare(proctor.full_name);
           break;
-        case 'department':
-          comparison = proctor.department.localeCompare(proctor.department); // จะถูกเรียงในระดับ outer loop
+        case "department":
+          comparison = proctor.department.localeCompare(proctor.department);
           break;
-        case 'date':
+        case "date":
           comparison = a.date.localeCompare(b.date);
           break;
-        case 'room':
+        case "room":
           comparison = a.room.localeCompare(b.room);
           break;
-        case 'course':
+        case "course":
           comparison = a.course_code.localeCompare(b.course_code);
           break;
         default:
           comparison = 0;
       }
-      
+
       return comparison * direction;
     });
   };
 
   const filterAndSortAssignments = (assignments, proctor) => {
     let filtered = assignments;
-    
+
     if (filterDate) {
-      filtered = filtered.filter(a => a.date === filterDate.value);
+      filtered = filtered.filter((a) => a.date === filterDate.value);
     }
-    
+
     return sortAssignments(filtered, proctor);
   };
 
-  // เพิ่มฟังก์ชันสำหรับเรียงลำดับ proctors
   const getSortedProctors = () => {
     if (!reportData?.proctors) return [];
-    
+
     return [...reportData.proctors].sort((a, b) => {
-      const direction = sortConfig.direction === 'asc' ? 1 : -1;
-      
+      const direction = sortConfig.direction === "asc" ? 1 : -1;
+
       switch (sortConfig.key) {
-        case 'proctor':
+        case "proctor":
           return a.full_name.localeCompare(b.full_name) * direction;
-        case 'department':
+        case "department":
           return a.department.localeCompare(b.department) * direction;
         default:
           return 0;
@@ -230,24 +271,26 @@ const ProctorReport = () => {
   const handleSort = (key) => {
     setSortConfig({
       key,
-      direction: sortConfig.key === key && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+      direction:
+        sortConfig.key === key && sortConfig.direction === "asc" ? "desc" : "asc",
     });
   };
 
   const renderSortIndicator = (key) => {
     if (sortConfig.key === key) {
-      return sortConfig.direction === 'asc' ? ' ▲' : ' ▼';
+      return sortConfig.direction === "asc" ? " ▲" : " ▼";
     }
-    return '';
+    return "";
   };
 
   const SortableHeader = ({ id, label }) => (
-    <th 
-      onClick={() => handleSort(id)} 
-      style={{ cursor: 'pointer', userSelect: 'none' }}
+    <th
+      onClick={() => handleSort(id)}
+      style={{ cursor: "pointer", userSelect: "none" }}
       className="sort-header"
     >
-      {label}{renderSortIndicator(id)}
+      {label}
+      {renderSortIndicator(id)}
     </th>
   );
 
@@ -259,7 +302,7 @@ const ProctorReport = () => {
           <Card className="shadow">
             <Card.Body>
               <Row className="g-3">
-                <Col md={6}>
+                <Col md={4}>
                   <Select
                     options={academicYears}
                     value={academicYear}
@@ -273,7 +316,8 @@ const ProctorReport = () => {
                     className="basic-select"
                   />
                 </Col>
-                <Col md={6}>
+
+                <Col md={4}>
                   <Select
                     options={semesters}
                     value={semester}
@@ -283,6 +327,21 @@ const ProctorReport = () => {
                       setFilterDate(null);
                     }}
                     placeholder="เลือกภาคการศึกษา"
+                    isDisabled={loading}
+                    className="basic-select"
+                  />
+                </Col>
+
+                <Col md={4}>
+                  <Select
+                    options={phases}
+                    value={phase}
+                    onChange={(selected) => {
+                      setPhase(selected);
+                      setSelectedProctor(null);
+                      setFilterDate(null);
+                    }}
+                    placeholder="เลือก Phase (ช่วงสอบ)"
                     isDisabled={loading}
                     className="basic-select"
                   />
@@ -333,9 +392,12 @@ const ProctorReport = () => {
                       <h5 className="mb-0">สถิติการคุมสอบรายวัน</h5>
                     </Card.Header>
                     <Card.Body>
-                      <div style={{ height: '400px' }}>
+                      <div style={{ height: "400px" }}>
                         <ResponsiveContainer>
-                          <BarChart data={getChartData()} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                          <BarChart
+                            data={getChartData()}
+                            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                          >
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis dataKey="date" />
                             <YAxis />
@@ -356,9 +418,9 @@ const ProctorReport = () => {
                       <Row className="g-3 mb-4">
                         <Col md={6}>
                           <Select
-                            options={reportData.proctors.map(p => ({
+                            options={reportData.proctors.map((p) => ({
                               value: p.user_id,
-                              label: `${p.full_name} (${p.department})`
+                              label: `${p.full_name} (${p.department})`,
                             }))}
                             value={selectedProctor}
                             onChange={setSelectedProctor}
@@ -369,9 +431,9 @@ const ProctorReport = () => {
                         </Col>
                         <Col md={6}>
                           <Select
-                            options={getDates().map(date => ({
+                            options={getDates().map((date) => ({
                               value: date,
-                              label: date
+                              label: date,
                             }))}
                             value={filterDate}
                             onChange={setFilterDate}
@@ -394,18 +456,25 @@ const ProctorReport = () => {
                             </tr>
                           </thead>
                           <tbody>
-                            {getSortedProctors().map(proctor => (
-                              (!selectedProctor || selectedProctor.value === proctor.user_id) &&
-                              filterAndSortAssignments(proctor.assignments, proctor).map((assignment, idx) => (
-                                <tr key={`${proctor.user_id}-${idx}`}>
-                                  <td>{proctor.full_name}</td>
-                                  <td>{proctor.department}</td>
-                                  <td>{assignment.date}</td>
-                                  <td>{roomMapping[assignment.room] || assignment.room}</td>
-                                  <td>{assignment.course_code}</td>
-                                </tr>
-                              ))
-                            ))}
+                            {getSortedProctors().map(
+                              (proctor) =>
+                                (!selectedProctor ||
+                                  selectedProctor.value === proctor.user_id) &&
+                                filterAndSortAssignments(
+                                  proctor.assignments,
+                                  proctor
+                                ).map((assignment, idx) => (
+                                  <tr key={`${proctor.user_id}-${idx}`}>
+                                    <td>{proctor.full_name}</td>
+                                    <td>{proctor.department}</td>
+                                    <td>{assignment.date}</td>
+                                    <td>
+                                      {roomMapping[assignment.room] || assignment.room}
+                                    </td>
+                                    <td>{assignment.course_code}</td>
+                                  </tr>
+                                ))
+                            )}
                           </tbody>
                         </Table>
                       </div>

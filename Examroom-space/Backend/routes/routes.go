@@ -88,10 +88,22 @@ func SetupRoutes(r *gin.Engine, db *sql.DB) {
 		protected.POST("/insert_data/users", examController.Insert)
 		protected.PUT("/update_data/users/:id", examController.EditUser)
 		protected.DELETE("/delete_data/users/:id", examController.DelUser)
+
+		// ===================== Reports =====================
+		// (เดิม) year/semester
 		protected.GET("/reports/paper-usage/:academic_year/:semester", examController.GetPaperUsageReport)
 		protected.GET("/reports/exam-submissions/:academic_year/:semester", examController.GetExamSubmissionReport)
 		protected.GET("/reports/proctor-stats/:academic_year/:semester", examController.GetProctorReport)
 		protected.GET("/reports/proctor-stats/:academic_year/:semester/:user_id", examController.GetProctorReport)
+
+		// (ใหม่) year/semester/phase
+		protected.GET("/reports/paper-usage/:academic_year/:semester/:phase", examController.GetPaperUsageReport)
+		protected.GET("/reports/exam-submissions/:academic_year/:semester/:phase", examController.GetExamSubmissionReport)
+
+		// (ใหม่) proctor-stats ใช้ static segment เพื่อไม่ชนกับ :user_id
+		protected.GET("/reports/proctor-stats/:academic_year/:semester/phase/:phase", examController.GetProctorReport)
+		protected.GET("/reports/proctor-stats/:academic_year/:semester/phase/:phase/user/:user_id", examController.GetProctorReport)
+
 		protected.PUT("/edit_department/:id", examController.EditDept)
 		protected.DELETE("/delete_department/:id", examController.DelDept)
 		protected.POST("/add_department", examController.AddDept)
@@ -123,6 +135,9 @@ func SetupRoutes(r *gin.Engine, db *sql.DB) {
 		protected.POST("/rooms", examController.CreateRoom)            // Create a new room
 		protected.PUT("/rooms/:room_id", examController.UpdateRoom)    // Update a room
 		protected.DELETE("/rooms/:room_id", examController.DeleteRoom) // Delete a room
+		protected.GET("/rooms/:room_id/seat-plan", examController.GetRoomSeatPlan) // ✅ NEW
+		protected.PUT("/rooms/:room_id/seat-plan", examController.UpsertRoomSeatPlan)   // ✅ เพิ่ม
+		protected.DELETE("/rooms/:room_id/seat-plan", examController.DeleteRoomSeatPlan) // ✅ เพิ่ม (ล้างผัง)
 
 		protected.POST("/admin/update/examtable", examController.UpdateExamTableNew)
 		protected.POST("/admin/update/roomexam", examController.UpdateRoomExamNew)
@@ -133,10 +148,8 @@ func SetupRoutes(r *gin.Engine, db *sql.DB) {
 		protected.GET("/select_data/examtable_all", examController.GetExamtableForEdit)
 		protected.GET("/select_data/roomexam_all", examController.GetRoomexamForEdit)
 
-
 		protected.POST("/admin/update/condition_proctor", examController.UpdateConditionProctorNew)
 		protected.GET("/activity-logs", examController.GetUserActivityLogs)
 
 	}
 }
-

@@ -18,14 +18,119 @@ const URL = localStorage.getItem("API");
 const token = localStorage.getItem("token");
 const authHeaders = { Authorization: `Bearer ${token}` };
 
-const alertError = (err, fallback = "เกิดข้อผิดพลาด") => {
-  const msg =
+const showErrorMessenger = ({
+  title = "เกิดข้อผิดพลาด",
+  message = "ระบบทำรายการไม่สำเร็จ",
+  solutions = [],
+  icon = "error",
+  confirmButtonColor = "#dc3545",
+}) => {
+  const solutionHtml =
+    solutions && solutions.length
+      ? `
+        <hr/>
+        <p class="text-start">
+          <strong>วิธีแก้ปัญหา:</strong><br/>
+          ${solutions.map((s) => `- ${s}<br/>`).join("")}
+        </p>
+      `
+      : "";
+
+  Swal.fire({
+    title,
+    html: `
+      <p>${message}</p>
+      ${solutionHtml}
+    `,
+    icon,
+    confirmButtonColor,
+  });
+};
+
+const alertError = (err, contextAction = "ทำรายการ") => {
+  const status = err?.response?.status;
+  const backendMsg =
     err?.response?.data?.error ||
     err?.response?.data?.message ||
     err?.message ||
-    fallback;
-  Swal.fire("ผิดพลาด", msg, "error");
-  console.error(err?.response || err);
+    "";
+
+  console.error("API ERROR ::", err?.response || err);
+
+  // 1) Network / server ไม่ตอบ
+  if (!err?.response) {
+    showErrorMessenger({
+      title: "ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้",
+      message: `ระบบไม่สามารถ${contextAction}ได้ในขณะนี้`,
+      solutions: [
+        "ตรวจสอบการเชื่อมต่ออินเทอร์เน็ตของคุณ",
+        "ลองรีเฟรชหน้าเว็บ แล้วทำรายการใหม่อีกครั้ง",
+        "หากยังมีปัญหา อาจเกิดจากเซิร์ฟเวอร์ กรุณาแจ้งผู้ดูแลระบบ",
+      ],
+      icon: "error",
+      confirmButtonColor: "#dc3545",
+    });
+    return;
+  }
+
+  // 2) Token / สิทธิ์
+  if (status === 401 || status === 403) {
+    showErrorMessenger({
+      title: "หมดอายุการเข้าสู่ระบบ หรือไม่มีสิทธิ์ใช้งาน",
+      message: `ระบบไม่สามารถ${contextAction}ได้ เพราะสิทธิ์ไม่เพียงพอ หรือ Token หมดอายุ`,
+      solutions: [
+        "ออกจากระบบ แล้วเข้าสู่ระบบใหม่อีกครั้ง",
+        "ตรวจสอบว่าใช้บัญชีที่มีสิทธิ์เข้าถึงฟีเจอร์นี้ได้ไหม",
+        "หากยังใช้งานไม่ได้ กรุณาแจ้งผู้ดูแลระบบ",
+      ],
+      icon: "error",
+      confirmButtonColor: "#dc3545",
+    });
+    return;
+  }
+
+  // 3) ไม่พบ API / path ผิด
+  if (status === 404) {
+    showErrorMessenger({
+      title: "ไม่พบบริการที่ต้องใช้ ( ไม่พบ API)",
+      message: `ระบบไม่สามารถ${contextAction}ได้ เพราะไม่พบเส้น API ที่เรียกใช้งาน`,
+      solutions: [
+        "ตรวจสอบว่า backend เปิดทำงานอยู่",
+      ],
+      icon: "error",
+      confirmButtonColor: "#dc3545",
+    });
+    return;
+  }
+
+  // 4) Server error
+  if (status >= 500) {
+    showErrorMessenger({
+      title: "เกิดข้อผิดพลาดที่เซิร์ฟเวอร์",
+      message: backendMsg || `ระบบไม่สามารถ${contextAction}ได้ (Server Error)`,
+      solutions: [
+        "ลองทำรายการซ้ำอีกครั้งในภายหลัง",
+        "รีเฟรชหน้าเว็บแล้วลองใหม่",
+        "หากยังเกิดซ้ำ กรุณาแจ้งผู้ดูแลระบบพร้อมภาพหน้าจอ/เวลาที่เกิดปัญหา",
+      ],
+      icon: "error",
+      confirmButtonColor: "#dc3545",
+    });
+    return;
+  }
+
+  // 5) เคสทั่วไป (400/422/etc.)
+  showErrorMessenger({
+    title: "เกิดข้อผิดพลาด",
+    message: backendMsg || `ระบบไม่สามารถ${contextAction}ได้`,
+    solutions: [
+      "ตรวจสอบข้อมูลที่กรอก/แก้ไขว่าถูกต้องครบถ้วน",
+      "ลองรีเฟรชหน้าเว็บแล้วทำรายการใหม่อีกครั้ง",
+      "หากยังมีปัญหา กรุณาแจ้งผู้ดูแลระบบ",
+    ],
+    icon: "error",
+    confirmButtonColor: "#dc3545",
+  });
 };
 
 // แปลงคีย์ตัวเลขให้เป็น number
@@ -68,11 +173,12 @@ const Examtable = () => {
       });
       setRows(Array.isArray(res.data) ? res.data : []);
     } catch (e) {
-      alertError(e, "โหลดข้อมูลตารางสอบไม่สำเร็จ");
+      alertError(e, "โหลดข้อมูลตารางสอบ");
     } finally {
       setLoading(false);
     }
   };
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -104,11 +210,16 @@ const Examtable = () => {
       await axios.post(`${URL}/admin/update/examtable`, payload, {
         headers: authHeaders,
       });
-      Swal.fire("สำเร็จ", "บันทึกข้อมูลแล้ว", "success");
+      Swal.fire({
+        title: "สำเร็จ",
+        text: "บันทึกข้อมูลแล้ว",
+        icon: "success",
+        confirmButtonColor: "#28a745",
+      });
       setOpen(false);
       fetchData();
     } catch (e) {
-      alertError(e, "อัปเดตไม่สำเร็จ");
+      alertError(e, "อัปเดตข้อมูลตารางสอบ");
     }
   };
 
@@ -216,11 +327,12 @@ const Roomexam = () => {
       });
       setRows(Array.isArray(res.data) ? res.data : []);
     } catch (e) {
-      alertError(e, "โหลดข้อมูลห้องสอบไม่สำเร็จ");
+      alertError(e, "โหลดข้อมูลห้องสอบ");
     } finally {
       setLoading(false);
     }
   };
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -253,21 +365,20 @@ const Roomexam = () => {
 
   const save = async () => {
     try {
-      const payload = toIntIfNeeded(form, [
-        "No",
-        "Ref",
-        "Hr",
-        "Room_id",
-        "Num_st",
-      ]);
+      const payload = toIntIfNeeded(form, ["No", "Ref", "Hr", "Room_id", "Num_st"]);
       await axios.post(`${URL}/admin/update/roomexam`, payload, {
         headers: authHeaders,
       });
-      Swal.fire("สำเร็จ", "บันทึกข้อมูลแล้ว", "success");
+      Swal.fire({
+        title: "สำเร็จ",
+        text: "บันทึกข้อมูลแล้ว",
+        icon: "success",
+        confirmButtonColor: "#28a745",
+      });
       setOpen(false);
       fetchData();
     } catch (e) {
-      alertError(e);
+      alertError(e, "อัปเดตข้อมูลห้องสอบ");
     }
   };
 
@@ -344,7 +455,7 @@ const Roomexam = () => {
   );
 };
 
-/* ===== 3) รายละเอียดข้อสอบ (detail_exam) เหมือนเวอร์ชันก่อน ===== */
+/* ===== 3) รายละเอียดข้อสอบ (detail_exam) ===== */
 const DetailExam = () => {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -380,7 +491,7 @@ const DetailExam = () => {
       });
       setRows(Array.isArray(res.data) ? res.data : []);
     } catch (e) {
-      alertError(e, "โหลดรายละเอียดข้อสอบไม่สำเร็จ");
+      alertError(e, "โหลดรายละเอียดข้อสอบ");
     } finally {
       setLoading(false);
     }
@@ -420,15 +531,19 @@ const DetailExam = () => {
   const save = async () => {
     try {
       const payload = toIntIfNeeded(form, ["Ref", "Copy", "Page", "Qty", "No_st"]);
-
       await axios.post(`${URL}/admin/update/detail_exam`, payload, {
         headers: authHeaders,
       });
-      Swal.fire("สำเร็จ", "บันทึกข้อมูลแล้ว", "success");
+      Swal.fire({
+        title: "สำเร็จ",
+        text: "บันทึกข้อมูลแล้ว",
+        icon: "success",
+        confirmButtonColor: "#28a745",
+      });
       setOpen(false);
       fetchData();
     } catch (e) {
-      alertError(e);
+      alertError(e, "อัปเดตรายละเอียดข้อสอบ");
     }
   };
 
@@ -475,12 +590,7 @@ const DetailExam = () => {
               <Form.Label>{k}</Form.Label>
               <Form.Control
                 value={form[k]}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    [k]: e.target.value,
-                  })
-                }
+                onChange={(e) => setForm({ ...form, [k]: e.target.value })}
               />
             </Form.Group>
           ))}

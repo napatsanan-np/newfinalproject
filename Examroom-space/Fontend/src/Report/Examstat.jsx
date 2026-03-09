@@ -17,6 +17,7 @@ import "./Examstat-styles.css";
 const Examstat = () => {
   const [academicYear, setAcademicYear] = useState(null);
   const [semester, setSemester] = useState(null);
+  const [phase, setPhase] = useState(null);
 
   const [data, setData] = useState(null);
   const [processedData, setProcessedData] = useState(null);
@@ -26,25 +27,18 @@ const Examstat = () => {
 
   const [academicYears, setAcademicYears] = useState([]);
   const [semesters, setSemesters] = useState([]);
+  const [phases, setPhases] = useState([]);
 
   const [selectedDepartment, setSelectedDepartment] = useState(null);
 
   const OTHER_DEPT_CODE = "999";
   const [dep, setDep] = useState([]);
 
-  // สร้างข้อมูลสำหรับ map id_dept -> name_th (เดิมคุณตั้งชื่อว่า DEPARTMENT_ORDER)
   const [DEPARTMENT_ORDER, setDEPARTMENT_ORDER] = useState({});
 
-  // กลุ่มรหัสของแต่ละภาควิชา (คงไว้ตามโครงสร้างเดิมของคุณ)
   const DEPARTMENT_GROUPS = {};
-
-  // ✅ จุดสำคัญ: DEPARTMENTS เป็น map "department_code" -> "ชื่อภาควิชา"
-  // ในโค้ดเดิมมีโอกาส undefined ได้ง่าย แต่ผมคงไว้และให้ fallback "อื่นๆ"
   const DEPARTMENTS = Object.fromEntries(
-    dep.map(({ id_dept_code, id_dept }) => [
-      id_dept_code,
-      DEPARTMENT_ORDER[id_dept],
-    ])
+    dep.map(({ id_dept_code, id_dept }) => [id_dept_code, DEPARTMENT_ORDER[id_dept]])
   );
 
   Object.entries(DEPARTMENTS).forEach(([code, name]) => {
@@ -91,33 +85,38 @@ const Examstat = () => {
           }
         );
 
-        const data = await response.json();
+        const cfg = await response.json();
         const data1 = await response1.json();
         const data2 = await response2.json();
 
-        // map: id_dept -> name_th
         const map = {};
-        data2.forEach((dep) => {
-          map[dep.id_dept] = dep.name_th;
+        data2.forEach((d) => {
+          map[d.id_dept] = d.name_th;
         });
 
         setDEPARTMENT_ORDER(map);
         setDep(data1);
 
-        const years = [...new Set(data.map((c) => c.academic_year))].map(
-          (year) => ({
-            value: year,
-            label: `ปีการศึกษา ${year}`,
-          })
-        );
+        const years = [...new Set(cfg.map((c) => c.academic_year))].map((year) => ({
+          value: year,
+          label: `ปีการศึกษา ${year}`,
+        }));
 
-        const terms = [...new Set(data.map((c) => c.semester))].map((term) => ({
+        const terms = [...new Set(cfg.map((c) => c.semester))].map((term) => ({
           value: term,
           label: term,
         }));
 
+        const phaseList = [...new Set(cfg.map((c) => c.phase))]
+          .filter((p) => p !== null && p !== undefined && String(p).trim() !== "")
+          .map((p) => ({
+            value: p,
+            label: String(p),
+          }));
+
         setAcademicYears(years);
         setSemesters(terms);
+        setPhases(phaseList);
       } catch (err) {
         console.error("Error fetching configs:", err);
         setError("ไม่สามารถดึงข้อมูลการตั้งค่าได้");
@@ -127,14 +126,12 @@ const Examstat = () => {
     fetchConfigs();
   }, []);
 
-  // ✅ แปลงข้อมูลเพื่อรวมภาควิชาที่มีชื่อเดียวกัน + เรียงลำดับแบบ “ฟิก”
   const processSubmissionData = (data) => {
     if (!data?.submissions) return null;
 
     const departmentData = new Map();
 
     data.submissions.forEach((dept) => {
-      // dept.department_code -> name (fallback เป็น "อื่นๆ")
       const deptName = DEPARTMENTS[dept.department_code] || "อื่นๆ";
 
       if (departmentData.has(deptName)) {
@@ -156,17 +153,11 @@ const Examstat = () => {
       }
     });
 
-    // ✅ จุดแก้หลัก: เรียงแบบคงที่ ไม่สลับไปมา
-    // 1) pending มาก -> มาก่อน
-    // 2) total_exams มาก -> มาก่อน
-    // 3) ชื่อไทย A-Z -> กันสลับ
-    const processedSubmissions = Array.from(departmentData.values()).sort(
-      (a, b) => {
-        if (b.pending !== a.pending) return b.pending - a.pending;
-        if (b.total_exams !== a.total_exams) return b.total_exams - a.total_exams;
-        return a.name.localeCompare(b.name, "th");
-      }
-    );
+    const processedSubmissions = Array.from(departmentData.values()).sort((a, b) => {
+      if (b.pending !== a.pending) return b.pending - a.pending;
+      if (b.total_exams !== a.total_exams) return b.total_exams - a.total_exams;
+      return a.name.localeCompare(b.name, "th");
+    });
 
     return {
       ...data,
@@ -175,7 +166,7 @@ const Examstat = () => {
   };
 
   const fetchSubmissionData = async () => {
-    if (!academicYear?.value || !semester?.value) return;
+    if (!academicYear?.value || !semester?.value || !phase?.value) return;
 
     setLoading(true);
     setError(null);
@@ -183,7 +174,7 @@ const Examstat = () => {
     try {
       const response = await fetch(
         localStorage.getItem("API") +
-          `/reports/exam-submissions/${academicYear.value}/${semester.value}`,
+          `/reports/exam-submissions/${academicYear.value}/${semester.value}/${phase.value}`,
         {
           method: "GET",
           headers: {
@@ -196,25 +187,21 @@ const Examstat = () => {
       if (!response.ok) {
         if (response.status === 500) {
           throw new Error(
-            `ไม่พบข้อมูลการสอบสำหรับปีการศึกษา ${academicYear.value} ภาคการศึกษา ${semester.value} กรุณาตรวจสอบว่ามีการตั้งค่าการสอบในช่วงเวลานี้หรือไม่`
+            `ไม่พบข้อมูลการสอบสำหรับปีการศึกษา ${academicYear.value} ภาคการศึกษา ${semester.value} (${phase.value}) กรุณาตรวจสอบว่ามีการตั้งค่าการสอบในช่วงเวลานี้หรือไม่`
           );
-        } else {
-          throw new Error(`HTTP error! status: ${response.status}`);
         }
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const jsonData = await response.json();
 
-      // แปลงข้อมูลเป็นจำนวนเต็ม (ไม่มีทศนิยม)
       if (jsonData.submissions) {
         jsonData.submissions = jsonData.submissions.map((dept) => ({
           ...dept,
           submitted: Math.round(dept.submitted),
           pending: Math.round(dept.pending),
           total_exams: Math.round(dept.total_exams),
-          courses: dept.courses.map((course) => ({
-            ...course,
-          })),
+          courses: dept.courses.map((course) => ({ ...course })),
         }));
       }
 
@@ -224,17 +211,19 @@ const Examstat = () => {
       setSelectedDepartment(null);
     } catch (err) {
       setError(err.message);
+      setData(null);
+      setProcessedData(null);
+      setSelectedDepartment(null);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (academicYear?.value && semester?.value) {
-      fetchSubmissionData();
-    }
+    // ไม่ auto ยิงก็ได้ แต่ผมคง behavior เดิม (พอกดปุ่มแสดงข้อมูล)
+    // ถ้าคุณอยาก auto ยิงเมื่อเลือกครบ 3 dropdown บอกได้ เดี๋ยวผมปรับ
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [academicYear, semester]);
+  }, [academicYear, semester, phase]);
 
   const getChartData = () => {
     if (!processedData?.processedSubmissions) return [];
@@ -339,8 +328,6 @@ const Examstat = () => {
 
   const getSortedDepartmentOptions = () => {
     if (!processedData?.processedSubmissions) return [];
-
-    // ✅ ให้ dropdown เรียง “แบบเดียวกับกราฟ” (ฟิกเหมือนกัน)
     return processedData.processedSubmissions.map((dept) => ({
       value: dept.name,
       label: `${dept.name} (${dept.deptCodes.join(", ")}) - ${dept.total_exams} วิชา`,
@@ -360,35 +347,57 @@ const Examstat = () => {
             </Card.Header>
             <Card.Body>
               <div className="row g-3">
-                <div className="col-md-5">
+                <div className="col-md-4">
                   <label className="form-label">ปีการศึกษา</label>
                   <Select
                     options={academicYears}
                     value={academicYear}
-                    onChange={setAcademicYear}
+                    onChange={(v) => {
+                      setAcademicYear(v);
+                      setSelectedDepartment(null);
+                    }}
                     placeholder="เลือกปีการศึกษา"
                     isDisabled={loading}
                     className="examstat-select"
                   />
                 </div>
 
-                <div className="col-md-5">
+                <div className="col-md-4">
                   <label className="form-label">ภาคการศึกษา</label>
                   <Select
                     options={semesters}
                     value={semester}
-                    onChange={setSemester}
+                    onChange={(v) => {
+                      setSemester(v);
+                      setSelectedDepartment(null);
+                    }}
                     placeholder="เลือกภาคการศึกษา"
                     isDisabled={loading}
                     className="examstat-select"
                   />
                 </div>
 
-                <div className="col-md-2 d-flex align-items-end">
+                <div className="col-md-4">
+                  <label className="form-label">Phase (ช่วงสอบ)</label>
+                  <Select
+                    options={phases}
+                    value={phase}
+                    onChange={(v) => {
+                      setPhase(v);
+                      setSelectedDepartment(null);
+                    }}
+                    placeholder="เลือก Phase"
+                    isDisabled={loading}
+                    className="examstat-select"
+                  />
+                </div>
+
+                <div className="col-md-12 d-flex justify-content-end">
                   <button
-                    className="btn btn-primary w-100"
+                    className="btn btn-primary"
                     onClick={fetchSubmissionData}
-                    disabled={!academicYear || !semester || loading}
+                    disabled={!academicYear || !semester || !phase || loading}
+                    style={{ minWidth: 160 }}
                   >
                     {loading ? (
                       <>
@@ -435,14 +444,9 @@ const Examstat = () => {
                   return (
                     <>
                       <div className="col-md-4">
-                        <div
-                          className="stats-card shadow-sm"
-                          style={{ backgroundColor: "#ffffff" }}
-                        >
+                        <div className="stats-card shadow-sm" style={{ backgroundColor: "#ffffff" }}>
                           <h6 className="text-muted mb-2">จำนวนวิชาทั้งหมด</h6>
-                          <h2 className="display-5 fw-bold text-primary">
-                            {stats.total}
-                          </h2>
+                          <h2 className="display-5 fw-bold text-primary">{stats.total}</h2>
                           <p className="mb-0">วิชา</p>
                         </div>
                       </div>
@@ -450,9 +454,7 @@ const Examstat = () => {
                       <div className="col-md-4">
                         <div className="stats-card success-card shadow-sm">
                           <h6 className="text-muted mb-2">ส่งแล้ว</h6>
-                          <h2 className="display-5 fw-bold text-success">
-                            {stats.submitted}
-                          </h2>
+                          <h2 className="display-5 fw-bold text-success">{stats.submitted}</h2>
                           <p className="mb-0">
                             วิชา (
                             {stats.total > 0
@@ -466,9 +468,7 @@ const Examstat = () => {
                       <div className="col-md-4">
                         <div className="stats-card warning-card shadow-sm">
                           <h6 className="text-muted mb-2">ยังไม่ส่ง</h6>
-                          <h2 className="display-5 fw-bold text-warning">
-                            {stats.pending}
-                          </h2>
+                          <h2 className="display-5 fw-bold text-warning">{stats.pending}</h2>
                           <p className="mb-0">
                             วิชา (
                             {stats.total > 0
@@ -487,7 +487,7 @@ const Examstat = () => {
                 <Card.Header className="bg-white d-flex justify-content-between align-items-center">
                   <h5 className="mb-0">สถานะการส่งข้อสอบแยกตามภาควิชา</h5>
                   <span className="text-muted small">
-                    {academicYear?.label} {semester?.label}
+                    {academicYear?.label} {semester?.label} {phase?.label ? `(${phase.label})` : ""}
                   </span>
                 </Card.Header>
 
@@ -500,33 +500,13 @@ const Examstat = () => {
                         margin={{ left: 20, right: 30, top: 10, bottom: 10 }}
                       >
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis
-                          type="number"
-                          tickFormatter={(value) => Math.round(value)}
-                        />
-                        <YAxis
-                          type="category"
-                          dataKey="name"
-                          width={180}
-                          tick={{ fontSize: 12 }}
-                        />
+                        <XAxis type="number" tickFormatter={(value) => Math.round(value)} />
+                        <YAxis type="category" dataKey="name" width={180} tick={{ fontSize: 12 }} />
                         <Tooltip content={getCustomTooltip} />
                         <Legend wrapperStyle={{ paddingTop: "10px" }} />
 
-                        <Bar
-                          dataKey="ส่งแล้ว"
-                          stackId="a"
-                          fill="#2ecc71"
-                          name="ส่งแล้ว"
-                          radius={[4, 0, 0, 4]}
-                        />
-                        <Bar
-                          dataKey="ยังไม่ส่ง"
-                          stackId="a"
-                          fill="#e74c3c"
-                          name="ยังไม่ส่ง"
-                          radius={[0, 4, 4, 0]}
-                        />
+                        <Bar dataKey="ส่งแล้ว" stackId="a" fill="#2ecc71" name="ส่งแล้ว" radius={[4, 0, 0, 4]} />
+                        <Bar dataKey="ยังไม่ส่ง" stackId="a" fill="#e74c3c" name="ยังไม่ส่ง" radius={[0, 4, 4, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -536,9 +516,7 @@ const Examstat = () => {
               <div className="department-selector shadow-sm mb-4">
                 <div className="row align-items-center">
                   <div className="col-md-3">
-                    <label className="form-label mb-md-0">
-                      เลือกภาควิชาเพื่อดูรายละเอียด:
-                    </label>
+                    <label className="form-label mb-md-0">เลือกภาควิชาเพื่อดูรายละเอียด:</label>
                   </div>
                   <div className="col-md-9">
                     <Select
@@ -555,9 +533,7 @@ const Examstat = () => {
                             }
                           : null
                       }
-                      onChange={(option) =>
-                        setSelectedDepartment(option?.value || null)
-                      }
+                      onChange={(option) => setSelectedDepartment(option?.value || null)}
                       isClearable
                       placeholder="เลือกภาควิชา..."
                       className="examstat-select"

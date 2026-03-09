@@ -5,46 +5,45 @@ import {
   Pie,
   Cell,
   Label,
-  Legend,
   Sector,
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
 import Select from "react-select";
-import SidebarMenu from '../Navbar/SidebarMenu';
+import SidebarMenu from "../Navbar/SidebarMenu";
 import "./Report-styles.css";
-
 
 const Report = () => {
   const COLORS = [
-    "#3498db", // สีฟ้าสด
-    "#2ecc71", // สีเขียวสด
-    "#f1c40f", // สีเหลือง
-    "#e74c3c", // สีแดง
-    "#9b59b6", // สีม่วง
-    "#1abc9c", // สีเขียวมิ้นท์
-    "#34495e", // สีเทาเข้ม
-    "#e67e22", // สีส้ม
-    "#95a5a6", // สีเทาอ่อน
-    "#27ae60", // สีเขียวเข้ม
-    "#2980b9", // สีฟ้าเข้ม
-    "#8e44ad", // สีม่วงเข้ม
-    "#f39c12", // สีส้มอมเหลือง
-    "#d35400", // สีส้มเข้ม
-    "#c0392b", // สีแดงเข้ม
-    "#16a085", // สีเขียวมิ้นท์เข้ม
+    "#3498db",
+    "#2ecc71",
+    "#f1c40f",
+    "#e74c3c",
+    "#9b59b6",
+    "#1abc9c",
+    "#34495e",
+    "#e67e22",
+    "#95a5a6",
+    "#27ae60",
+    "#2980b9",
+    "#8e44ad",
+    "#f39c12",
+    "#d35400",
+    "#c0392b",
+    "#16a085",
   ];
-  
-  const OTHER_DEPT_CODE = "999";
-  
-  // แมปรหัสภาควิชากับชื่อภาควิชา
-    const [DEPARTMENT_ORDER, setDEPARTMENT_ORDER] = useState({});
 
+  const OTHER_DEPT_CODE = "999";
+
+  const [DEPARTMENT_ORDER, setDEPARTMENT_ORDER] = useState({});
   const [dep, setDep] = useState([]);
-  const DEPARTMENTS = Object.fromEntries(dep.map(({ id_dept_code, id_dept }) => [id_dept_code.toString(), DEPARTMENT_ORDER[id_dept]]));
-  
-  console.log("DEPARTMENTS1", DEPARTMENTS || "-");
-  // สร้างกลุ่มรหัสของแต่ละภาควิชา
+  const DEPARTMENTS = Object.fromEntries(
+    dep.map(({ id_dept_code, id_dept }) => [
+      id_dept_code.toString(),
+      DEPARTMENT_ORDER[id_dept],
+    ])
+  );
+
   const DEPARTMENT_GROUPS = {};
   Object.entries(DEPARTMENTS).forEach(([code, name]) => {
     if (!DEPARTMENT_GROUPS[name]) {
@@ -52,29 +51,29 @@ const Report = () => {
     }
     DEPARTMENT_GROUPS[name].push(code);
   });
-  
 
-
-  // คำนวณตำแหน่งของ label เพื่อให้ไม่ทับกัน
   const renderCustomizedLabel = ({
-    cx, cy, midAngle, innerRadius, outerRadius, percent, index, name, value
+    cx,
+    cy,
+    midAngle,
+    outerRadius,
+    percent,
+    index,
+    name,
   }) => {
     const RADIAN = Math.PI / 180;
-    // เพิ่มระยะห่างของ label จากวงกลม
     const radius = outerRadius * 1.35;
-    // คำนวณตำแหน่ง x, y ตามมุมและรัศมี
     const x = cx + radius * Math.cos(-midAngle * RADIAN);
     const y = cy + radius * Math.sin(-midAngle * RADIAN);
-  
-    // ตรวจสอบว่าควรแสดง label หรือไม่ (สำหรับข้อมูลที่มีค่าน้อยเกินไป)
+
     if (percent < 0.02) return null;
-  
+
     return (
-      <text 
-        x={x} 
-        y={y} 
+      <text
+        x={x}
+        y={y}
         fill={COLORS[index % COLORS.length]}
-        textAnchor={x > cx ? 'start' : 'end'} 
+        textAnchor={x > cx ? "start" : "end"}
         dominantBaseline="central"
         fontSize="12"
         fontWeight="bold"
@@ -83,14 +82,18 @@ const Report = () => {
       </text>
     );
   };
-  
-  // รูปทรงที่จะแสดงเมื่อ active slice
+
   const renderActiveShape = (props) => {
-    const RADIAN = Math.PI / 180;
-    const { cx, cy, midAngle, innerRadius, outerRadius, startAngle, endAngle, fill, payload, percent, value } = props;
-    const sin = Math.sin(-RADIAN * midAngle);
-    const cos = Math.cos(-RADIAN * midAngle);
-    
+    const {
+      cx,
+      cy,
+      innerRadius,
+      outerRadius,
+      startAngle,
+      endAngle,
+      fill,
+    } = props;
+
     return (
       <g>
         <Sector
@@ -114,31 +117,37 @@ const Report = () => {
       </g>
     );
   };
-  
+
   const [academicYear, setAcademicYear] = useState(null);
   const [semester, setSemester] = useState(null);
+  const [phase, setPhase] = useState(null);
+
   const [reportData, setReportData] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [selectedDepartment, setSelectedDepartment] = useState(null);
   const [academicYears, setAcademicYears] = useState([]);
   const [semesters, setSemesters] = useState([]);
+  const [phases, setPhases] = useState([]);
   const [activeIndex, setActiveIndex] = useState(null);
 
   useEffect(() => {
     const fetchConfigs = async () => {
       try {
         const response = await fetch(
-          localStorage.getItem("API") + "/select_data/exam_config", {
-            method: "GET", 
+          localStorage.getItem("API") + "/select_data/exam_config",
+          {
+            method: "GET",
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
               "Content-Type": "application/json",
             },
           }
         );
+
         const response1 = await fetch(
-          localStorage.getItem("API") + "/select_data/departments_group", {
+          localStorage.getItem("API") + "/select_data/departments_group",
+          {
             method: "GET",
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -146,8 +155,10 @@ const Report = () => {
             },
           }
         );
+
         const response2 = await fetch(
-          localStorage.getItem("API") + "/select_data/departments", {
+          localStorage.getItem("API") + "/select_data/departments",
+          {
             method: "GET",
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -155,29 +166,40 @@ const Report = () => {
             },
           }
         );
+
         const data = await response.json();
         const data1 = await response1.json();
         const data2 = await response2.json();
+
         const map = {};
-        data2.forEach(dep => {
-          map[dep.id_dept] = dep.name_th;
-          //console.log("user.id_dept" , dep.name_th)
-          setDEPARTMENT_ORDER(map)
+        data2.forEach((d) => {
+          map[d.id_dept] = d.name_th;
         });
+        setDEPARTMENT_ORDER(map);
         setDep(data1);
+
         const years = [...new Set(data.map((c) => c.academic_year))].map(
           (year) => ({
             value: year,
             label: `ปีการศึกษา ${year}`,
           })
         );
+
         const terms = [...new Set(data.map((c) => c.semester))].map((term) => ({
           value: term,
           label: term,
         }));
 
+        const phaseList = [...new Set(data.map((c) => c.phase))]
+          .filter((p) => p !== null && p !== undefined && String(p).trim() !== "")
+          .map((p) => ({
+            value: p,
+            label: String(p),
+          }));
+
         setAcademicYears(years);
         setSemesters(terms);
+        setPhases(phaseList);
       } catch (err) {
         console.error("Error fetching configs:", err);
         setError("ไม่สามารถดึงข้อมูลการตั้งค่าได้");
@@ -190,30 +212,25 @@ const Report = () => {
   const formatData = (data) => {
     if (!data?.paper_usage) return { chartData: [], summary: null };
 
-    // แทนที่จะใช้ department code ให้ใช้ department name เป็นคีย์
     const departmentData = new Map();
     let otherCourses = [];
 
-    // ขั้นตอนแรก: รวบรวมข้อมูลจากทุกรหัสภาควิชา
     data.paper_usage.forEach((dept) => {
       if (DEPARTMENTS[dept.department_code]) {
         const deptName = DEPARTMENTS[dept.department_code];
-        console.log("dept.department_code" , dept.department_code)
         const existing = departmentData.get(deptName);
-        
+
         if (existing) {
-          // ถ้าภาควิชานี้มีอยู่แล้ว ให้รวมข้อมูล
           existing.value += dept.total_pages;
           existing.deptCodes.push(dept.department_code);
           existing.courses = [...existing.courses, ...dept.courses];
         } else {
-          // ถ้าเป็นภาควิชาใหม่
           departmentData.set(deptName, {
             name: deptName,
             value: dept.total_pages,
             deptCodes: [dept.department_code],
             courses: dept.courses,
-            order: DEPARTMENT_ORDER[deptName] || 999
+            order: DEPARTMENT_ORDER[deptName] || 999,
           });
         }
       } else {
@@ -226,25 +243,22 @@ const Report = () => {
         (sum, course) => sum + course.total_papers,
         0
       );
-      departmentData.set('อื่นๆ', {
-        name: 'อื่นๆ',
+      departmentData.set("อื่นๆ", {
+        name: "อื่นๆ",
         value: otherTotalPages,
         deptCodes: [OTHER_DEPT_CODE],
         courses: otherCourses,
-        order: DEPARTMENT_ORDER['อื่นๆ'] || 999
+        order: DEPARTMENT_ORDER["อื่นๆ"] || 999,
       });
     }
 
-    // แปลงข้อมูลให้เป็น array และเรียงลำดับตาม order
-    const chartData = Array.from(departmentData.values())
-      .sort((a, b) => a.order - b.order);
-      
+    const chartData = Array.from(departmentData.values()).sort(
+      (a, b) => a.order - b.order
+    );
+
     const summary = {
       totalPages: chartData.reduce((sum, dept) => sum + dept.value, 0),
-      totalCourses: chartData.reduce(
-        (sum, dept) => sum + dept.courses.length,
-        0
-      ),
+      totalCourses: chartData.reduce((sum, dept) => sum + dept.courses.length, 0),
       departmentDetails: chartData,
     };
 
@@ -252,14 +266,16 @@ const Report = () => {
   };
 
   const fetchReport = async () => {
-    if (!academicYear?.value || !semester?.value) return;
+    if (!academicYear?.value || !semester?.value || !phase?.value) return;
 
     setLoading(true);
     setError(null);
 
     try {
       const response = await fetch(
-        localStorage.getItem("API") + `/reports/paper-usage/${academicYear.value}/${semester.value}`, {
+        localStorage.getItem("API") +
+          `/reports/paper-usage/${academicYear.value}/${semester.value}/${phase.value}`,
+        {
           method: "GET",
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -270,29 +286,35 @@ const Report = () => {
 
       if (!response.ok) {
         if (response.status === 500) {
-          throw new Error(`ไม่พบข้อมูลการใช้กระดาษสำหรับปีการศึกษา ${academicYear.value} ภาคการศึกษา ${semester.value} กรุณาตรวจสอบว่ามีการตั้งค่าการสอบในช่วงเวลานี้หรือไม่`);
-        } else {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          throw new Error(
+            `ไม่พบข้อมูลการใช้กระดาษสำหรับปีการศึกษา ${academicYear.value} ภาคการศึกษา ${semester.value} (${phase.value}) กรุณาตรวจสอบว่ามีการตั้งค่าการสอบในช่วงเวลานี้หรือไม่`
+          );
         }
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log("API response data:", data); // เพิ่ม log เพื่อดูข้อมูลที่ได้รับจาก API
       const formattedData = formatData(data);
       setReportData(formattedData);
       setSelectedDepartment(null);
     } catch (err) {
       setError(err.message);
+      setReportData(null);
+      setSelectedDepartment(null);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (academicYear?.value && semester?.value) {
+    if (academicYear?.value && semester?.value && phase?.value) {
       fetchReport();
+    } else {
+      setReportData(null);
+      setSelectedDepartment(null);
     }
-  }, [academicYear, semester]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [academicYear, semester, phase]);
 
   const DepartmentDetails = ({ department }) => {
     if (!department) return null;
@@ -300,7 +322,7 @@ const Report = () => {
     const sortedCourses = [...department.courses].sort(
       (a, b) => b.total_papers - a.total_papers
     );
-    console.log("department" , department.deptCodes)
+
     return (
       <Card className="mt-4">
         <Card.Header>
@@ -328,9 +350,7 @@ const Report = () => {
                 {sortedCourses.map((course, idx) => (
                   <tr key={idx}>
                     <td>{course.course_code}</td>
-                    <td className="text-end">
-                      {course.pages.toLocaleString()}
-                    </td>
+                    <td className="text-end">{course.pages.toLocaleString()}</td>
                     <td className="text-end">
                       {course.students.toLocaleString()}
                     </td>
@@ -347,15 +367,15 @@ const Report = () => {
     );
   };
 
-  // สร้างตัวเลือกภาควิชาที่เรียงลำดับแล้ว
   const getSortedDepartmentOptions = () => {
     if (!reportData?.chartData) return [];
-    
-    return reportData.chartData.map(dept => ({
-      value: dept.name,
-      label: `${dept.name} - ${dept.value.toLocaleString()} แผ่น`,
-      order: dept.order
-    })).sort((a, b) => a.order - b.order);
+    return reportData.chartData
+      .map((dept) => ({
+        value: dept.name,
+        label: `${dept.name} - ${dept.value.toLocaleString()} แผ่น`,
+        order: dept.order,
+      }))
+      .sort((a, b) => a.order - b.order);
   };
 
   return (
@@ -366,22 +386,43 @@ const Report = () => {
           <Card className="shadow">
             <Card.Body>
               <div className="row g-3">
-                <div className="col-md-6">
+                <div className="col-md-4">
                   <Select
                     options={academicYears}
                     value={academicYear}
-                    onChange={setAcademicYear}
+                    onChange={(v) => {
+                      setAcademicYear(v);
+                      setSelectedDepartment(null);
+                    }}
                     placeholder="เลือกปีการศึกษา"
                     isDisabled={loading}
                     className="basic-select h-100"
                   />
                 </div>
-                <div className="col-md-6">
+
+                <div className="col-md-4">
                   <Select
                     options={semesters}
                     value={semester}
-                    onChange={setSemester}
+                    onChange={(v) => {
+                      setSemester(v);
+                      setSelectedDepartment(null);
+                    }}
                     placeholder="เลือกภาคการศึกษา"
+                    isDisabled={loading}
+                    className="basic-select h-100"
+                  />
+                </div>
+
+                <div className="col-md-4">
+                  <Select
+                    options={phases}
+                    value={phase}
+                    onChange={(v) => {
+                      setPhase(v);
+                      setSelectedDepartment(null);
+                    }}
+                    placeholder="เลือก Phase (ช่วงสอบ)"
                     isDisabled={loading}
                     className="basic-select h-100"
                   />
@@ -402,15 +443,13 @@ const Report = () => {
                 </div>
               )}
 
-              {reportData?.chartData.length > 0 && (
+              {reportData?.chartData?.length > 0 && (
                 <div className="mt-4">
                   <div className="row g-3 mb-4">
                     <div className="col-md-4">
                       <div className="p-3 bg-light rounded h-100">
                         <h6 className="text-muted">จำนวนแผ่นรวมทั้งหมด</h6>
-                        <h3>
-                          {reportData.summary.totalPages.toLocaleString()} แผ่น
-                        </h3>
+                        <h3>{reportData.summary.totalPages.toLocaleString()} แผ่น</h3>
                       </div>
                     </div>
                     <div className="col-md-4">
@@ -449,9 +488,7 @@ const Report = () => {
                             fill="#8884d8"
                             dataKey="value"
                             nameKey="name"
-                            onClick={(data) =>
-                              setSelectedDepartment(data.name)
-                            }
+                            onClick={(d) => setSelectedDepartment(d.name)}
                             onMouseEnter={(_, index) => setActiveIndex(index)}
                             onMouseLeave={() => setActiveIndex(null)}
                           >
@@ -473,21 +510,21 @@ const Report = () => {
                               fontWeight="bold"
                             />
                           </Pie>
+
                           <Tooltip
-                            formatter={(value) =>
-                              `${value.toLocaleString()} แผ่น`
-                            }
+                            formatter={(value) => `${value.toLocaleString()} แผ่น`}
                             labelFormatter={(name) => `${name}`}
-                            contentStyle={{ 
-                              backgroundColor: 'rgba(255, 255, 255, 0.9)', 
-                              border: '1px solid #ddd',
-                              borderRadius: '4px',
-                              padding: '10px'
+                            contentStyle={{
+                              backgroundColor: "rgba(255, 255, 255, 0.9)",
+                              border: "1px solid #ddd",
+                              borderRadius: "4px",
+                              padding: "10px",
                             }}
                           />
                         </PieChart>
                       </ResponsiveContainer>
                     </div>
+
                     <div className="mt-3 p-3 bg-light rounded">
                       <p className="text-muted mb-2">
                         <i className="fas fa-info-circle me-2"></i>
@@ -508,9 +545,7 @@ const Report = () => {
                                 ? {
                                     value: selectedDepartment,
                                     label: `${selectedDepartment} - ${reportData.chartData
-                                      .find(
-                                        (d) => d.name === selectedDepartment
-                                      )
+                                      .find((d) => d.name === selectedDepartment)
                                       ?.value.toLocaleString()} แผ่น`,
                                   }
                                 : null

@@ -7,21 +7,27 @@ import (
 )
 
 // GetPaperUsageStats ดึงข้อมูลการใช้กระดาษ
-func (s *UserSelectService) GetPaperUsageStats(academicYear, semester string) (map[string]interface{}, error) {
-	// ดึง id_config จาก exam_config
+func (s *UserSelectService) GetPaperUsageStats(academicYear, semester, phase string) (map[string]interface{}, error) {
+	// หา id_config ตาม year/semester/(phase)
 	configQuery := `
-        SELECT id_config 
-        FROM exam_config 
+        SELECT id_config
+        FROM exam_config
         WHERE academic_year = $1 AND semester = $2
     `
+	args := []interface{}{academicYear, semester}
+	if phase != "" {
+		configQuery += " AND phase = $3"
+		args = append(args, phase)
+	}
+	configQuery += " ORDER BY id_config DESC LIMIT 1"
+
 	var idConfig int
-	err := s.DB.QueryRow(configQuery, academicYear, semester).Scan(&idConfig)
-	if err != nil {
+	if err := s.DB.QueryRow(configQuery, args...).Scan(&idConfig); err != nil {
 		return nil, fmt.Errorf("error getting exam config: %v", err)
 	}
 
 	query := `
-        SELECT 
+        SELECT
             SUBSTRING(e.course, 1, 3) as dept_code,
             e.course,
             d.page,
@@ -49,8 +55,8 @@ func (s *UserSelectService) GetPaperUsageStats(academicYear, semester string) (m
 	for rows.Next() {
 		var deptCode, course, lecturer string
 		var page, noSt sql.NullString
-		err := rows.Scan(&deptCode, &course, &page, &noSt, &lecturer)
-		if err != nil {
+
+		if err := rows.Scan(&deptCode, &course, &page, &noSt, &lecturer); err != nil {
 			return nil, fmt.Errorf("error scanning row: %v", err)
 		}
 
@@ -63,10 +69,10 @@ func (s *UserSelectService) GetPaperUsageStats(academicYear, semester string) (m
 			studentNum = parseInt(noSt.String)
 		}
 
-		// เผื่อกระดาษตามนักเรียน
 		adjustedStudents := int(math.Ceil(float64(studentNum) * (1 + backupRatio)))
 		totalPapers := adjustedStudents * pageNum
 		backup := totalPapers - (studentNum * pageNum)
+
 		if _, exists := departments[deptCode]; !exists {
 			departments[deptCode] = map[string]interface{}{
 				"department_code": deptCode,
@@ -107,26 +113,34 @@ func (s *UserSelectService) GetPaperUsageStats(academicYear, semester string) (m
 			"total_students": totalStudents,
 			"academic_year":  academicYear,
 			"semester":       semester,
+			"phase":          phase,
 			"backup_ratio":   backupRatio,
 		},
 	}, nil
 }
 
 // GetExamSubmissionStats ดึงข้อมูลการส่งข้อสอบ
-func (s *UserSelectService) GetExamSubmissionStats(academicYear, semester string) (map[string]interface{}, error) {
+func (s *UserSelectService) GetExamSubmissionStats(academicYear, semester, phase string) (map[string]interface{}, error) {
+	// หา id_config ตาม year/semester/(phase)
 	configQuery := `
-        SELECT id_config 
-        FROM exam_config 
+        SELECT id_config
+        FROM exam_config
         WHERE academic_year = $1 AND semester = $2
     `
+	args := []interface{}{academicYear, semester}
+	if phase != "" {
+		configQuery += " AND phase = $3"
+		args = append(args, phase)
+	}
+	configQuery += " ORDER BY id_config DESC LIMIT 1"
+
 	var idConfig int
-	err := s.DB.QueryRow(configQuery, academicYear, semester).Scan(&idConfig)
-	if err != nil {
+	if err := s.DB.QueryRow(configQuery, args...).Scan(&idConfig); err != nil {
 		return nil, fmt.Errorf("error getting exam config: %v", err)
 	}
 
 	query := `
-        SELECT 
+        SELECT
             SUBSTRING(e.course, 1, 3) as dept_code,
             e.course,
             d.submit as submit_status,
@@ -148,8 +162,7 @@ func (s *UserSelectService) GetExamSubmissionStats(academicYear, semester string
 
 	for rows.Next() {
 		var deptCode, course, submitStatus, subDate, lecturer string
-		err := rows.Scan(&deptCode, &course, &submitStatus, &subDate, &lecturer)
-		if err != nil {
+		if err := rows.Scan(&deptCode, &course, &submitStatus, &subDate, &lecturer); err != nil {
 			return nil, fmt.Errorf("error scanning row: %v", err)
 		}
 
@@ -167,26 +180,15 @@ func (s *UserSelectService) GetExamSubmissionStats(academicYear, semester string
 		deptData := departments[deptCode]
 		deptData["total_exams"] = deptData["total_exams"].(int) + 1
 
-		// // สถานะจะเป็นไปตามค่าในฐานข้อมูล
-		// if submitStatus == "ส่งแล้ว" {
-		// 	deptData["submitted"] = deptData["submitted"].(int) + 1
-		// } else if submitStatus == "มีสอบแต่ไม่มีข้อสอบส่ง" {
-		// 	// กรณีใหม่ที่เราต้องใส่ค่ามือในฐานข้อมูล หรือเช็คจาก page == 0
-		// 	deptData["no_exam"] = deptData["no_exam"].(int) + 1
-		// } else {
-		// 	deptData["pending"] = deptData["pending"].(int) + 1
-		// }
-			
 		statusType := classifySubmissionStatus(submitStatus)
-
-	switch statusType {
-	case "submitted":
-		deptData["submitted"] = deptData["submitted"].(int) + 1
-	case "no_exam":
-		deptData["no_exam"] = deptData["no_exam"].(int) + 1
-	default:
-		deptData["pending"] = deptData["pending"].(int) + 1
-	}
+		switch statusType {
+		case "submitted":
+			deptData["submitted"] = deptData["submitted"].(int) + 1
+		case "no_exam":
+			deptData["no_exam"] = deptData["no_exam"].(int) + 1
+		default:
+			deptData["pending"] = deptData["pending"].(int) + 1
+		}
 
 		deptData["courses"] = append(deptData["courses"].([]map[string]interface{}), map[string]interface{}{
 			"course_code":     course,
@@ -203,25 +205,36 @@ func (s *UserSelectService) GetExamSubmissionStats(academicYear, semester string
 
 	return map[string]interface{}{
 		"submissions": departmentsList,
+		"summary": map[string]interface{}{
+			"academic_year": academicYear,
+			"semester":      semester,
+			"phase":         phase,
+		},
 	}, nil
 }
 
 // GetProctorStats ดึงข้อมูลการคุมสอบ
-func (s *UserSelectService) GetProctorStats(academicYear, semester, userId string) (map[string]interface{}, error) {
-	// ดึง id_config จาก exam_config
+func (s *UserSelectService) GetProctorStats(academicYear, semester, phase, userId string) (map[string]interface{}, error) {
+	// หา id_config ตาม year/semester/(phase)
 	configQuery := `
-        SELECT id_config 
-        FROM exam_config 
+        SELECT id_config
+        FROM exam_config
         WHERE academic_year = $1 AND semester = $2
     `
+	argsCfg := []interface{}{academicYear, semester}
+	if phase != "" {
+		configQuery += " AND phase = $3"
+		argsCfg = append(argsCfg, phase)
+	}
+	configQuery += " ORDER BY id_config DESC LIMIT 1"
+
 	var idConfig int
-	err := s.DB.QueryRow(configQuery, academicYear, semester).Scan(&idConfig)
-	if err != nil {
+	if err := s.DB.QueryRow(configQuery, argsCfg...).Scan(&idConfig); err != nil {
 		return nil, fmt.Errorf("error getting exam config: %v", err)
 	}
 
 	query := `
-        SELECT 
+        SELECT
             u.user_id,
             u.full_name,
             u.department,
@@ -235,12 +248,13 @@ func (s *UserSelectService) GetProctorStats(academicYear, semester, userId strin
         JOIN roomexam r ON p.ref = r.ref AND p.no = r.no AND p.id_config = r.id_config
         WHERE p.id_config = $1
     `
-
 	args := []interface{}{idConfig}
+
 	if userId != "" {
 		query += " AND p.user_id = $2"
 		args = append(args, userId)
 	}
+
 	query += " ORDER BY u.full_name, r.edate, r.etime"
 
 	rows, err := s.DB.Query(query, args...)
@@ -252,15 +266,14 @@ func (s *UserSelectService) GetProctorStats(academicYear, semester, userId strin
 	proctors := make(map[string]map[string]interface{})
 
 	for rows.Next() {
-		var userId, fullName, department, edate, etime, roomId, course, numSt string
-		err := rows.Scan(&userId, &fullName, &department, &edate, &etime, &roomId, &course, &numSt)
-		if err != nil {
+		var uid, fullName, department, edate, etime, roomId, course, numSt string
+		if err := rows.Scan(&uid, &fullName, &department, &edate, &etime, &roomId, &course, &numSt); err != nil {
 			return nil, fmt.Errorf("error scanning row: %v", err)
 		}
 
-		if _, exists := proctors[userId]; !exists {
-			proctors[userId] = map[string]interface{}{
-				"user_id":           userId,
+		if _, exists := proctors[uid]; !exists {
+			proctors[uid] = map[string]interface{}{
+				"user_id":           uid,
 				"full_name":         fullName,
 				"department":        department,
 				"total_assignments": 0,
@@ -268,7 +281,7 @@ func (s *UserSelectService) GetProctorStats(academicYear, semester, userId strin
 			}
 		}
 
-		proctorData := proctors[userId]
+		proctorData := proctors[uid]
 		proctorData["total_assignments"] = proctorData["total_assignments"].(int) + 1
 		proctorData["assignments"] = append(proctorData["assignments"].([]map[string]interface{}), map[string]interface{}{
 			"date":           edate,
@@ -286,13 +299,20 @@ func (s *UserSelectService) GetProctorStats(academicYear, semester, userId strin
 
 	return map[string]interface{}{
 		"proctors": proctorsList,
+		"summary": map[string]interface{}{
+			"academic_year": academicYear,
+			"semester":      semester,
+			"phase":         phase,
+		},
 	}, nil
 }
 
 // GetExamConfigs ดึงข้อมูล exam configs ทั้งหมด
 func (s *UserSelectService) GetExamConfigs() ([]map[string]interface{}, error) {
+	// ✅ เพิ่ม phase เข้าไปด้วย (สำคัญสำหรับ dropdown ในหน้าบ้าน)
 	query := `
-        SELECT id_config, academic_year, semester, 
+        SELECT id_config, academic_year, semester,
+               COALESCE(phase,'') as phase,
                COALESCE(prep_period_start::text, '') as prep_period_start,
                COALESCE(prep_period_end::text, '') as prep_period_end,
                COALESCE(exam_period_start::text, '') as exam_period_start,
@@ -311,13 +331,14 @@ func (s *UserSelectService) GetExamConfigs() ([]map[string]interface{}, error) {
 	configs := make([]map[string]interface{}, 0)
 	for rows.Next() {
 		var idConfig int
-		var academicYear, semester string
+		var academicYear, semester, phase string
 		var prepStart, prepEnd, examStart, examEnd string
 		var status bool
 
-		err := rows.Scan(&idConfig, &academicYear, &semester,
-			&prepStart, &prepEnd, &examStart, &examEnd, &status)
-		if err != nil {
+		if err := rows.Scan(
+			&idConfig, &academicYear, &semester, &phase,
+			&prepStart, &prepEnd, &examStart, &examEnd, &status,
+		); err != nil {
 			return nil, fmt.Errorf("error scanning row: %v", err)
 		}
 
@@ -325,6 +346,7 @@ func (s *UserSelectService) GetExamConfigs() ([]map[string]interface{}, error) {
 			"id_config":         idConfig,
 			"academic_year":     academicYear,
 			"semester":          semester,
+			"phase":             phase,
 			"prep_period_start": prepStart,
 			"prep_period_end":   prepEnd,
 			"exam_period_start": examStart,
@@ -339,8 +361,10 @@ func (s *UserSelectService) GetExamConfigs() ([]map[string]interface{}, error) {
 
 // GetActiveExamConfig ดึงข้อมูล exam config ที่กำลังใช้งาน
 func (s *UserSelectService) GetActiveExamConfig() (map[string]interface{}, error) {
+	// ✅ เพิ่ม phase เข้าไปด้วย
 	query := `
-        SELECT id_config, academic_year, semester, 
+        SELECT id_config, academic_year, semester,
+               COALESCE(phase,'') as phase,
                COALESCE(prep_period_start::text, '') as prep_period_start,
                COALESCE(prep_period_end::text, '') as prep_period_end,
                COALESCE(exam_period_start::text, '') as exam_period_start,
@@ -353,13 +377,14 @@ func (s *UserSelectService) GetActiveExamConfig() (map[string]interface{}, error
     `
 
 	var idConfig int
-	var academicYear, semester string
+	var academicYear, semester, phase string
 	var prepStart, prepEnd, examStart, examEnd string
 	var status bool
 
-	err := s.DB.QueryRow(query).Scan(&idConfig, &academicYear, &semester,
-		&prepStart, &prepEnd, &examStart, &examEnd, &status)
-	if err != nil {
+	if err := s.DB.QueryRow(query).Scan(
+		&idConfig, &academicYear, &semester, &phase,
+		&prepStart, &prepEnd, &examStart, &examEnd, &status,
+	); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("no active exam config found")
 		}
@@ -370,6 +395,7 @@ func (s *UserSelectService) GetActiveExamConfig() (map[string]interface{}, error
 		"id_config":         idConfig,
 		"academic_year":     academicYear,
 		"semester":          semester,
+		"phase":             phase,
 		"prep_period_start": prepStart,
 		"prep_period_end":   prepEnd,
 		"exam_period_start": examStart,

@@ -13,7 +13,7 @@ import useSWR, { mutate } from "swr";
 import _ from "lodash";
 
 const CourseManagementButton = () => {
-  const url = localStorage.getItem("API") ;
+  const url = localStorage.getItem("API");
   const token = localStorage.getItem("token");
   const [show, setShow] = useState(false);
   const handleClose = () => setShow(false);
@@ -198,18 +198,18 @@ const CourseManagementButton = () => {
     const { name, value } = e.target;
     setnewData((prevData) => {
       let newValue = value;
-      
+
       // For Ref and No fields, convert to integer
       if (name === "Ref" || name === "No") {
         newValue = parseInt(value) || 0;
       }
-      
+
       // For hr and Num_st fields, ensure only numbers are entered
       if (name === "hr" || name === "Num_st") {
         // Replace any non-digit character with empty string
         newValue = value.replace(/\D/g, '');
       }
-      
+
       return { ...prevData, [name]: newValue };
     });
   };
@@ -287,14 +287,14 @@ const CourseManagementButton = () => {
 
     try {
       const response = await fetch(
-        url + "/New_Insert_Exam" ,
+        url + "/New_Insert_Exam",
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body : JSON.stringify(dataToSubmit)
+          body: JSON.stringify(dataToSubmit)
         }
       );
       console.log(JSON.stringify(dataToSubmit))
@@ -444,7 +444,7 @@ const CourseManagementButton = () => {
                     onChange={handleLecturerChange}
                   >
                     <option value="">เลือกอาจารย์ผู้สอน</option>
-                    
+
                     {lecturerList.map((lecturer) => (
                       <option key={lecturer} value={lecturer}>
                         {lecturer}
@@ -471,7 +471,7 @@ const CourseManagementButton = () => {
                     onChange={handleProctorChange}
                   >
                     <option value="">เลือกกรรมการคุมสอบ</option>
-                   
+
                     {lecturerList.map((lecturer) => (
                       <option key={lecturer} value={lecturer}>
                         {lecturer}
@@ -500,6 +500,7 @@ const CourseManagementButton = () => {
                     name="eDate"
                     value={newData.eDate || ""}
                     onChange={handleChange}
+                    onKeyDown={(e) => e.preventDefault()}
                   />
                 </BootstrapForm.Group>
               </Col>
@@ -545,7 +546,7 @@ const CourseManagementButton = () => {
                     onChange={handleRoomChange}
                   >
                     <option value="">เลือกห้องสอบ</option>
-           
+
                     {rooms.map((room) => (
                       <option key={room.room_id} value={room.room_id}>
                         {room.room_name}

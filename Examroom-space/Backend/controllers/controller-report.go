@@ -14,13 +14,14 @@ import (
 func (rc *Controller) GetPaperUsageReport(c *gin.Context) {
 	academicYear := c.Param("academic_year")
 	semester := c.Param("semester")
+	phase := c.Param("phase") // optional
 
 	if academicYear == "" || semester == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "GetPaperUsageReport academic_year and semester are required"})
 		return
 	}
 
-	stats, err := rc.SelectService.GetPaperUsageStats(academicYear, semester)
+	stats, err := rc.SelectService.GetPaperUsageStats(academicYear, semester, phase)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -33,13 +34,14 @@ func (rc *Controller) GetPaperUsageReport(c *gin.Context) {
 func (rc *Controller) GetExamSubmissionReport(c *gin.Context) {
 	academicYear := c.Param("academic_year")
 	semester := c.Param("semester")
+	phase := c.Param("phase") // optional
 
 	if academicYear == "" || semester == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "academic_year and semester are required"})
 		return
 	}
 
-	stats, err := rc.SelectService.GetExamSubmissionStats(academicYear, semester)
+	stats, err := rc.SelectService.GetExamSubmissionStats(academicYear, semester, phase)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -52,14 +54,26 @@ func (rc *Controller) GetExamSubmissionReport(c *gin.Context) {
 func (rc *Controller) GetProctorReport(c *gin.Context) {
 	academicYear := c.Param("academic_year")
 	semester := c.Param("semester")
-	userId := c.Param("user_id")
+
+	// รองรับ 2 แบบ:
+	// 1) /reports/proctor-stats/:academic_year/:semester/:user_id (เดิม)
+	// 2) /reports/proctor-stats/:academic_year/:semester/:phase/:user_id (ใหม่)
+	phase := c.Param("phase")    // อาจเป็น "" หรืออาจโดน bind เป็น user_id (กรณี route เดิม)
+	userId := c.Param("user_id") // จะมีเมื่อ route มี :user_id
 
 	if academicYear == "" || semester == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "academic_year and semester are required"})
 		return
 	}
 
-	stats, err := rc.SelectService.GetProctorStats(academicYear, semester, userId)
+	// เคส route เดิมแบบ 3 segment: /.../:semester/:user_id
+	// ตอนนี้ phase จะเท่ากับ user_id และ user_id จะว่าง -> normalize
+	if userId == "" && phase != "" {
+		userId = phase
+		phase = ""
+	}
+
+	stats, err := rc.SelectService.GetProctorStats(academicYear, semester, phase, userId)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
