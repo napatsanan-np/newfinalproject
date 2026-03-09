@@ -153,7 +153,7 @@ func main() {
 
 	r.Use(cors.New(cors.Config{
 		AllowOriginFunc: func(origin string) bool {
-			return isAllowedOrigin(origin, frontendURL)
+			return true
 		},
 		AllowMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders: []string{
@@ -165,11 +165,8 @@ func main() {
 			"X-CSRF-Token",
 		},
 		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
+		AllowCredentials: false,
 		MaxAge:           12 * time.Hour,
-		AllowWildcard:    false,
-		AllowWebSockets:  true,
-		AllowFiles:       false,
 	}))
 
 	routes.SetupRoutes(r, db)
