@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -12,24 +13,32 @@ import (
 )
 
 func Connect() (*sql.DB, error) {
+	var connStr string
 
-	connStr := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=disable",
-		os.Getenv("POSTGRES_USER"),
-		os.Getenv("POSTGRES_PASSWORD"),
-		os.Getenv("POSTGRES_DB"),
-		os.Getenv("POSTGRES_HOST"),
-		os.Getenv("POSTGRES_PORT"),
-	)
+	// ใช้ DATABASE_URL ก่อนสำหรับ Railway / Cloud
+	databaseURL := strings.TrimSpace(os.Getenv("DATABASE_URL"))
+	if databaseURL != "" {
+		connStr = databaseURL
+	} else {
+		// fallback สำหรับรันในเครื่อง
+		connStr = fmt.Sprintf(
+			"user=%s password=%s dbname=%s host=%s port=%s sslmode=disable",
+			os.Getenv("POSTGRES_USER"),
+			os.Getenv("POSTGRES_PASSWORD"),
+			os.Getenv("POSTGRES_DB"),
+			os.Getenv("POSTGRES_HOST"),
+			os.Getenv("POSTGRES_PORT"),
+		)
+	}
 
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open a DB connection: %w", err)
-
 	}
 
 	// Verify the connection is valid
 	if err := db.Ping(); err != nil {
-		return nil, fmt.Errorf("failed to ping DB: %w ", err)
+		return nil, fmt.Errorf("failed to ping DB: %w", err)
 	}
 
 	// Connection Pool Settings
@@ -54,6 +63,7 @@ func getEnvAsInt(name string, defaultVal int) int {
 	}
 	return defaultVal
 }
+
 func init() {
 	err := godotenv.Load()
 	if err != nil {
