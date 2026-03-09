@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/config"
@@ -13,85 +12,24 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func normalizeURL(u string) string {
-	return strings.TrimRight(strings.TrimSpace(u), "/")
-}
-
-func getFrontendURL() string {
-	host := os.Getenv("URL_FONTEND")
-	if host == "" {
-		host = os.Getenv("URL_FRONTEND")
-	}
-	if host == "" {
-		fmt.Println("Warning: URL_FONTEND / URL_FRONTEND is not set. Using default localhost.")
-		host = "http://localhost:5173"
-	}
-	return normalizeURL(host)
-}
-
-func isAllowedOrigin(origin string, frontendURL string) bool {
-	origin = normalizeURL(origin)
-	if origin == "" {
-		return false
-	}
-
-	allowedExact := map[string]bool{
-		normalizeURL(frontendURL):             true,
-		"https://project-superend.vercel.app": true,
-		"https://examroom-space.vercel.app":   true,
-		"http://localhost:3000":               true,
-		"http://localhost:5173":               true,
-		"http://127.0.0.1:3000":               true,
-		"http://127.0.0.1:5173":               true,
-	}
-
-	if allowedExact[origin] {
-		return true
-	}
-
-	if strings.HasSuffix(origin, ".vercel.app") {
-		return true
-	}
-
-	if strings.HasSuffix(origin, ".su.ac.th") {
-		return true
-	}
-
-	return false
-}
-
-func SecurityHeaders(frontendURL string) gin.HandlerFunc {
+func SecurityHeaders() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		connectSrc := strings.Join([]string{
-			"'self'",
-			frontendURL,
-			"https://project-superend.vercel.app",
-			"https://examroom-space.vercel.app",
-			"https://*.vercel.app",
-			"http://localhost:8080",
-			"http://localhost:3000",
-			"http://localhost:5173",
-			"http://127.0.0.1:8080",
-			"http://127.0.0.1:3000",
-			"http://127.0.0.1:5173",
-			"https:",
-			"wss:",
-		}, " ")
-
+		// อัพเดท CSP
 		c.Header("Content-Security-Policy",
 			"default-src 'self'; "+
 				"script-src 'self' 'unsafe-inline' 'unsafe-eval'; "+
 				"style-src 'self' 'unsafe-inline'; "+
 				"img-src 'self' data: blob: https:; "+
-				"font-src 'self' data: https:; "+
-				"connect-src "+connectSrc+"; "+
-				"media-src 'self' blob: data:; "+
+				"font-src 'self' data:; "+
+				"connect-src 'self' http://localhost:8080 http://localhost:3000/ "+
+				"media-src 'self'; "+
 				"object-src 'none'; "+
 				"child-src 'self'; "+
 				"frame-ancestors 'none'; "+
 				"form-action 'self'; "+
 				"base-uri 'self';")
 
+		// เพิ่ม Security Headers
 		c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		c.Header("X-Frame-Options", "DENY")
 		c.Header("X-Content-Type-Options", "nosniff")
@@ -102,10 +40,86 @@ func SecurityHeaders(frontendURL string) gin.HandlerFunc {
 		c.Header("Cross-Origin-Opener-Policy", "same-origin")
 		c.Header("Cross-Origin-Resource-Policy", "same-origin")
 
+		// ลบ headers ที่อาจเปิดเผยข้อมูล
 		c.Header("Server", "")
 		c.Header("X-Powered-By", "")
 
 		c.Next()
+	}
+}
+
+func main() {
+	// Initialize database connection with connection pooling
+	db, err := config.Connect()
+	if err != nil {
+		fmt.Printf("Failed to connect to database: %v\n", err)
+		os.Exit(1)
+	}
+	defer db.Close()
+
+	// Test database connection
+	if err := db.Ping(); err != nil {
+		fmt.Printf("Failed to ping database: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Println("Database connected successfully with connection pooling")
+
+	gin.SetMode(gin.DebugMode)
+	r := gin.New()
+	r.Use(gin.Logger())
+	r.Use(SecurityHeaders())
+	r.Use(CustomRecovery())
+
+	host := os.Getenv("URL_FONTEND")
+	if host == "" {
+		fmt.Println("Warning: URL_FONTEND is not set. Using default localhost.")
+		host = "http://localhost:5173"
+	}
+
+	// อัพเดท CORS configuration
+	r.Use(cors.New(cors.Config{
+		AllowOrigins: []string{host},
+		AllowMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders: []string{
+			"Origin",
+			"Content-Type",
+			"Accept",
+			"Authorization",
+			"X-Requested-With",
+			"X-CSRF-Token",
+		},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+		AllowWildcard:    false,
+		AllowWebSockets:  false,
+		AllowFiles:       false,
+	}))
+
+	// Security Headers middleware
+
+	// Rate limiting middleware (ถ้าต้องการ)
+	// r.Use(ratelimit.RateLimiter(time.Second, 100))
+
+	// ตั้งค่า Routes with database connection
+	routes.SetupRoutes(r, db)
+
+	fmt.Println("รันที่ DNS ::: " + host)
+
+	// Environment-based server configuration
+	if os.Getenv("ENVIRONMENT") == "production" {
+		// Production settings
+		cert := os.Getenv("SSL_CERT_PATH")
+		key := os.Getenv("SSL_KEY_PATH")
+		if cert != "" && key != "" {
+			r.RunTLS(":443", cert, key)
+		} else {
+			fmt.Println("Warning: SSL certificate paths not set. Running without TLS.")
+			r.Run(":8080")
+		}
+	} else {
+		// Development settings
+		r.Run(":8080")
 	}
 }
 
@@ -121,84 +135,5 @@ func CustomRecovery() gin.HandlerFunc {
 			}
 		}()
 		c.Next()
-	}
-}
-
-func main() {
-	db, err := config.Connect()
-	if err != nil {
-		fmt.Printf("Failed to connect to database: %v\n", err)
-		os.Exit(1)
-	}
-	defer db.Close()
-
-	if err := db.Ping(); err != nil {
-		fmt.Printf("Failed to ping database: %v\n", err)
-		os.Exit(1)
-	}
-	fmt.Println("Database connected successfully with connection pooling")
-
-	frontendURL := getFrontendURL()
-
-	if os.Getenv("ENVIRONMENT") == "production" {
-		gin.SetMode(gin.ReleaseMode)
-	} else {
-		gin.SetMode(gin.DebugMode)
-	}
-
-	r := gin.New()
-	r.Use(gin.Logger())
-	r.Use(SecurityHeaders(frontendURL))
-	r.Use(CustomRecovery())
-
-	r.Use(cors.New(cors.Config{
-		AllowOriginFunc: func(origin string) bool {
-			return true
-		},
-		AllowMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders: []string{
-			"Origin",
-			"Content-Type",
-			"Accept",
-			"Authorization",
-			"X-Requested-With",
-			"X-CSRF-Token",
-		},
-		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: false,
-		MaxAge:           12 * time.Hour,
-	}))
-
-	routes.SetupRoutes(r, db)
-
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-
-	fmt.Println("Frontend URL ::: " + frontendURL)
-	fmt.Println("Running HTTP on port " + port)
-
-	if os.Getenv("ENVIRONMENT") == "production" {
-		cert := os.Getenv("SSL_CERT_PATH")
-		key := os.Getenv("SSL_KEY_PATH")
-
-		if cert != "" && key != "" {
-			if err := r.RunTLS(":443", cert, key); err != nil {
-				fmt.Printf("Failed to start HTTPS server: %v\n", err)
-				os.Exit(1)
-			}
-		} else {
-			fmt.Println("Warning: SSL certificate paths not set. Running without TLS.")
-			if err := r.Run(":" + port); err != nil {
-				fmt.Printf("Failed to start server: %v\n", err)
-				os.Exit(1)
-			}
-		}
-	} else {
-		if err := r.Run(":" + port); err != nil {
-			fmt.Printf("Failed to start server: %v\n", err)
-			os.Exit(1)
-		}
 	}
 }
