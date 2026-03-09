@@ -30,10 +30,14 @@ import ActivityLogs from "./Report/ActivityLogs.jsx";
 const isAuthenticated = () => !!localStorage.getItem("token");
 
 
-localStorage.setItem('API', "http://localhost:8080/api")
+// localStorage.setItem('API', "http://localhost:8080/api")
+// window.User = JSON.parse(localStorage.getItem('user'));
+// console.log(localStorage.getItem('API'));
+
+
+localStorage.setItem('API', "https://projectsuperend-production.up.railway.app/api")
 window.User = JSON.parse(localStorage.getItem('user'));
 console.log(localStorage.getItem('API'));
-
 
 /**localStorage.setItem('API', "https://exam.sc.su.ac.th/api")  
 window.User = JSON.parse(localStorage.getItem('user'));
