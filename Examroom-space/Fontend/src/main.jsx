@@ -35,9 +35,15 @@ const isAuthenticated = () => !!localStorage.getItem("token");
 // console.log(localStorage.getItem('API'));
 
 
-localStorage.setItem('API', "https://projectsuperend-production.up.railway.app/api")
+const DEFAULT_API = "https://projectsuperend-production.up.railway.app/api";
+
+
+if (!localStorage.getItem("API")) {
+  localStorage.setItem("API", DEFAULT_API);
+}
+
 window.User = JSON.parse(localStorage.getItem('user'));
-console.log(localStorage.getItem('API'));
+console.log("API:", localStorage.getItem('API'));
 
 /**localStorage.setItem('API', "https://exam.sc.su.ac.th/api")  
 window.User = JSON.parse(localStorage.getItem('user'));
