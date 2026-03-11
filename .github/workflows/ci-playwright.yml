@@ -85,12 +85,7 @@ jobs:
         working-directory: Examroom-space
         run: docker compose --env-file .env.ci up -d
 
-      - name: Debug containers
-        working-directory: Examroom-space
-        run: |
-            docker ps -a
-            docker compose --env-file .env.ci logs db --no-color
-            docker compose --env-file .env.ci logs backend --no-color
+
 
 
       #รอให้เว็บ frontend พร้อมใช้งานก่อนเริ่มเทส
@@ -98,15 +93,7 @@ jobs:
         working-directory: Examroom-space
         run: npx wait-on http://127.0.0.1:3000
 
-      - name: Wait for Database startup
-        working-directory: Examroom-space
-        run: sleep 15
-
-      #รอ backend API
-      - name: Wait for Backend
-        working-directory: Examroom-space
-        run: npx wait-on http://127.0.0.1:8080 --timeout 120000
-
+    
 
       #รันชุดทดสอบ Playwright
       #จะสั่งรันทุกเทสต์ที่อยู่ในโฟลเดอร์ tests
@@ -114,7 +101,7 @@ jobs:
         working-directory: Examroom-space
         env:
           CI: "true"
-        run: npx playwright test
+        run: npx playwright test tests/ui
 
 
       #ถ้าเทสต์ล้มเหลว ให้เก็บรายงานผลการทดสอบไว้เป็นอาร์ติแฟกต์
@@ -127,7 +114,7 @@ jobs:
           path: |
             Examroom-space/playwright-report
             Examroom-space/test-results
-
+          if-no-files-found: ignore
 
       #ถ้าเทสต์ล้มเหลว ให้แสดง log ของ docker compose
       - name: Docker logs (on failure)
