@@ -31,6 +31,8 @@
   },
   "homepage": "https://github.com/Wanke66/Examroom-space#readme",
   "devDependencies": {
-    "@playwright/test": "^1.55.1"
+    "@playwright/test": "^1.55.1",
+    "dotenv": "^17.3.1",
+    "wait-on": "^9.0.4"
   }
 }

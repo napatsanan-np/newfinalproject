@@ -1,0 +1,133 @@
+name: CI Docker + Playwright (Examroom-space)
+
+#กำหนด “เหตุการณ์” ที่จะให้ workflow ทำงาน
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+#กำหนด “งาน” ที่จะให้ workflow ทำงาน
+jobs:
+  e2e:
+
+    #รันงานบน Ubuntu ล่าสุด
+    runs-on: ubuntu-latest
+
+    #ขั้นตอนในการรันงาน
+    steps:
+
+      #ดึง source code จาก repo มาไว้ใน runner
+      #runner คือ environment ชั่วคราวที่ GitHub สร้างขึ้นมาเพื่อรัน workflow
+      - name: Checkout
+        uses: actions/checkout@v4
+
+
+      #ตรวจโครงสร้างโปรเจค เพื่อกัน path ผิด ชื่อ โฟดเดอร์ ผิด
+      #พิมพ์หัวข้อว่า “Repo root” เพื่อแบ่ง section ใน log
+        #แสดงรายการไฟล์/โฟลเดอร์ที่ root ของ runner ณ ตอนนั้น
+        #พิมพ์หัวข้อ section “Examroom-space”
+        #แสดงรายการในโฟลเดอร์ Examroom-space
+        #พิมพ์หัวข้อ section “Fontend”
+        #แสดงรายการในโฟลเดอร์ Frontend ของคุณ
+        #เช็คว่ามีไฟล์ package.json จริงไหม test -f จะคืนค่า 0 ถ้ามีไฟล์นั้นอยู่
+        #เช็คว่ามี package-lock.json จริงไหม
+        #เช็คว่ามี config ของ Playwright อยู่จริงไหม
+        #เช็คว่า มี docker-compose.yml อยู่จริงไหม
+      - name: Verify project structure
+        run: |
+          echo "=== Repo root ==="
+          ls -la
+          echo "=== Examroom-space ==="
+          ls -la Examroom-space
+          echo "=== Tests ==="
+          ls -la Examroom-space/tests
+          echo "=== Frontend ==="
+          ls -la Examroom-space/Fontend
+          test -f Examroom-space/package.json      
+          test -f Examroom-space/playwright.config.js
+          test -f Examroom-space/docker-compose.yml
+
+
+      #ตั้งค่า Node.js ให้พร้อมใช้ npm/npx
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+
+      #ติดตั้ง dependencies ของ Playwright
+      #ติดตั้ง dependency แบบ “ล็อกเวอร์ชันตาม package-lock.json”
+      - name: Install dependencies
+        working-directory: Examroom-space
+        run: npm ci
+
+
+      #ติดตั้ง browser ที่ Playwright ใช้ทดสอบ
+      #พร้อม dependency ฝั่ง Linux
+      - name: Install Playwright browsers
+        working-directory: Examroom-space
+        run: npx playwright install --with-deps chromium
+
+
+      #อันนี้จะเป็นการ build docker image ของ backend และ frontend
+      - name: Build backend Docker image
+        working-directory: Examroom-space/Backend
+        run: docker build -t local/backend:fixed .
+
+      - name: Build frontend Docker image
+        working-directory: Examroom-space/Fontend
+        run: docker build -t local/frontend:fixed .
+
+
+      #สตาร์ท docker compose ขึ้นมา
+      - name: Start Docker Compose
+        working-directory: Examroom-space
+        run: docker compose up -d
+
+
+      #รอให้เว็บ frontend พร้อมใช้งานก่อนเริ่มเทส
+      - name: Wait for Frontend
+        working-directory: Examroom-space
+        run: npx wait-on http://127.0.0.1:3000
+
+
+      #รอ backend API
+      - name: Wait for Backend
+        working-directory: Examroom-space
+        run: npx wait-on http://127.0.0.1:8080
+
+
+      #รันชุดทดสอบ Playwright
+      #จะสั่งรันทุกเทสต์ที่อยู่ในโฟลเดอร์ tests
+      - name: Run Playwright tests
+        working-directory: Examroom-space
+        env:
+          CI: "true"
+        run: npx playwright test
+
+
+      #ถ้าเทสต์ล้มเหลว ให้เก็บรายงานผลการทดสอบไว้เป็นอาร์ติแฟกต์
+    #   if: failure() จะทำให้ขั้นตอนนี้รันเฉพาะเมื่อขั้นตอนก่อนหน้าล้มเหลว
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            Examroom-space/playwright-report
+            Examroom-space/test-results
+
+
+      #ถ้าเทสต์ล้มเหลว ให้แสดง log ของ docker compose
+      - name: Docker logs (on failure)
+        if: failure()
+        working-directory: Examroom-space
+        run: docker compose logs --no-color
+
+
+      #ปิด docker compose ไม่ว่าจะผ่านหรือ fail ก็ตาม
+      - name: Shutdown
+        if: always()
+        working-directory: Examroom-space
+        run: docker compose down -v

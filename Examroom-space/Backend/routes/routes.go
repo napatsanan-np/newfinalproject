@@ -27,6 +27,10 @@ func SetupRoutes(r *gin.Engine, db *sql.DB) {
 	r.POST("/api/login", examController.Login)
 	r.GET("/api/sso/login", examController.LoginHandler)
 	r.GET("/api/callback", examController.CallbackHandler)
+	// Health check (สำหรับ test / docker / k8s)
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "ok"})
+	})
 	// Protected routes ConditionWithproctor //UpdateBackupExam
 
 	//--------------------------------------------------------------(อาจารย์)--------------------------------------------------------------------------------------------------------------------------------------
@@ -132,11 +136,11 @@ func SetupRoutes(r *gin.Engine, db *sql.DB) {
 
 		protected.GET("/ConditionWithproctor", examController.ConditionWithproctor)
 
-		protected.POST("/rooms", examController.CreateRoom)            // Create a new room
-		protected.PUT("/rooms/:room_id", examController.UpdateRoom)    // Update a room
-		protected.DELETE("/rooms/:room_id", examController.DeleteRoom) // Delete a room
-		protected.GET("/rooms/:room_id/seat-plan", examController.GetRoomSeatPlan) // ✅ NEW
-		protected.PUT("/rooms/:room_id/seat-plan", examController.UpsertRoomSeatPlan)   // ✅ เพิ่ม
+		protected.POST("/rooms", examController.CreateRoom)                              // Create a new room
+		protected.PUT("/rooms/:room_id", examController.UpdateRoom)                      // Update a room
+		protected.DELETE("/rooms/:room_id", examController.DeleteRoom)                   // Delete a room
+		protected.GET("/rooms/:room_id/seat-plan", examController.GetRoomSeatPlan)       // ✅ NEW
+		protected.PUT("/rooms/:room_id/seat-plan", examController.UpsertRoomSeatPlan)    // ✅ เพิ่ม
 		protected.DELETE("/rooms/:room_id/seat-plan", examController.DeleteRoomSeatPlan) // ✅ เพิ่ม (ล้างผัง)
 
 		protected.POST("/admin/update/examtable", examController.UpdateExamTableNew)
