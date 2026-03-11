@@ -1,3 +1,4 @@
 ssl/
 *.env
 ฺDatabase/Backup.tar
+!.env.ci

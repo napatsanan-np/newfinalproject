@@ -83,7 +83,10 @@ jobs:
       #สตาร์ท docker compose ขึ้นมา
       - name: Start Docker Compose
         working-directory: Examroom-space
-        run: docker compose up -d
+        run: docker compose --env-file .env up -d
+
+    #     run: docker compose up -d
+        
 
 
       #รอให้เว็บ frontend พร้อมใช้งานก่อนเริ่มเทส
