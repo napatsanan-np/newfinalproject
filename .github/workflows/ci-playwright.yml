@@ -85,8 +85,12 @@ jobs:
         working-directory: Examroom-space
         run: docker compose --env-file .env.ci up -d
 
-    #     run: docker compose up -d
-        
+      - name: Debug containers
+        working-directory: Examroom-space
+        run: |
+            docker ps -a
+            docker compose logs backend --no-color
+            docker compose logs db --no-color
 
 
       #รอให้เว็บ frontend พร้อมใช้งานก่อนเริ่มเทส
@@ -98,7 +102,7 @@ jobs:
       #รอ backend API
       - name: Wait for Backend
         working-directory: Examroom-space
-        run: npx wait-on http://127.0.0.1:8080
+        run: npx wait-on http://127.0.0.1:8080 --timeout 120000
 
 
       #รันชุดทดสอบ Playwright
