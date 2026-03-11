@@ -89,8 +89,8 @@ jobs:
         working-directory: Examroom-space
         run: |
             docker ps -a
-            docker compose logs backend --no-color
-            docker compose logs db --no-color
+            docker compose --env-file .env.ci logs db --no-color
+            docker compose --env-file .env.ci logs backend --no-color
 
 
       #รอให้เว็บ frontend พร้อมใช้งานก่อนเริ่มเทส
@@ -98,6 +98,9 @@ jobs:
         working-directory: Examroom-space
         run: npx wait-on http://127.0.0.1:3000
 
+      - name: Wait for Database startup
+        working-directory: Examroom-space
+        run: sleep 15
 
       #รอ backend API
       - name: Wait for Backend
@@ -137,4 +140,4 @@ jobs:
       - name: Shutdown
         if: always()
         working-directory: Examroom-space
-        run: docker compose down -v
+        run: docker compose --env-file .env.ci down -v
