@@ -16,7 +16,7 @@ import DropFileInput from "./Pre-Exam/ImportFile/DropFileInput.jsx";
 import AutoExam from "./Pre-Exam/AutoRoomExam/AutoRoom.jsx";
 import AllExamroom from "./Pre-Exam/AutoRoomExam/Examroom.jsx";
 import Sentform_roleteacher from "./Exam/SentForm/SentForm_roleteacher.jsx";
-import ProctorAsigner from "./Pre-Exam/Proctor/ProctorAsigner.jsx"; // แก้ไข path
+import ProctorAsigner from "./Pre-Exam/Proctor/ProctorAsigner.jsx";
 import SystemManagement from "./System-Management/SystemManagementModule/Configexam.jsx";
 import CommitteeManagement from "./User-Management/ProctorExam/ProctorExamination.jsx";
 import TimeSettingsModal from "./System-Management/SystemManagementModule/TimeSettingsModal.jsx";
@@ -30,19 +30,11 @@ import ReceiveOnlineExam from "./Exam/SentForm/ReceiveOnlineExam.jsx";
 
 const isAuthenticated = () => !!localStorage.getItem("token");
 
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080/api";
+localStorage.setItem("API", API_URL);
 
-localStorage.setItem('API', "http://localhost:8080/api")
-window.User = JSON.parse(localStorage.getItem('user'));
-console.log(localStorage.getItem('API'));
-
-
-
-/**localStorage.setItem('API', "https://exam.sc.su.ac.th/api")  
-window.User = JSON.parse(localStorage.getItem('user'));
-console.log(localStorage.getItem('API'));**/
-
-//console.log("User:: " ,window.User.full_name);
-//Backup
+window.User = JSON.parse(localStorage.getItem("user"));
+console.log("API =", localStorage.getItem("API"));
 
 const router = createBrowserRouter([
   {
@@ -77,7 +69,6 @@ const router = createBrowserRouter([
     path: "/CommitteeManagement",
     element: <CommitteeManagement />,
   },
-
   {
     path: "/AutoRoom",
     element: <ProtectRoutes element={<AutoExam />} />,
@@ -149,7 +140,7 @@ window.addEventListener("unload", () => {
 
   if (token) {
     try {
-      const decodedToken = JSON.parse(atob(token.split('.')[1]));
+      const decodedToken = JSON.parse(atob(token.split(".")[1]));
       const expiryTime = decodedToken.exp * 1000;
 
       if (Date.now() > expiryTime) {
