@@ -90,21 +90,21 @@ test.describe("ProctorAssigner UI - Upload only", () => {
     await p.goto();
   });
 
-  // test("อัปโหลดไฟล์สำเร็จ", async ({ page }) => {
-  //   const p = new ProctorAssignerPage(page);
-  //   const filePath = path.resolve(__dirname, "../fixtures/sample.xlsx");
+  test("อัปโหลดไฟล์สำเร็จ", async ({ page }) => {
+    const p = new ProctorAssignerPage(page);
+    const filePath = path.resolve(__dirname, "../fixtures/sample.xlsx");
 
-  //   await p.clickUploadTab();
-  //   await p.chooseFile(filePath);
+    await p.clickUploadTab();
+    await p.chooseFile(filePath);
 
-  //   await expect(page.locator("text=ไฟล์ที่เลือก:")).toContainText("sample.xlsx");
+    await expect(page.locator("text=ไฟล์ที่เลือก:")).toContainText("sample.xlsx");
 
-  //   await p.clickUpload();
-  //   await expect(p.swalPopup).toBeVisible();
+    await p.clickUpload();
+    await expect(p.swalPopup).toBeVisible();
 
-  //   await p.confirmSwal();
-  //   await expect(page.locator(".swal2-popup")).toContainText("สำเร็จ");
-  // });
+    await p.confirmSwal();
+    await expect(page.locator(".swal2-popup")).toContainText("สำเร็จ");
+  });
 
   test("ไม่ได้เลือกไฟล์แต่กดอัปโหลด", async ({ page }) => {
     const p = new ProctorAssignerPage(page);

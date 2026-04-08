@@ -467,7 +467,7 @@ export function ExcelImportModal({ show, handleClose, onImportSuccess, datas }) 
                     <div
                       style={{
                         marginTop: "8px",
-                        fontSize: "16pt",
+                        fontSize: "24pt",
                         fontWeight: "bold",
                         color: getSessionColor(datas?.roomexam?.Etime),
                         whiteSpace: "nowrap",
@@ -621,18 +621,70 @@ export function ExcelImportModal({ show, handleClose, onImportSuccess, datas }) 
   });
 
   const CoverPage = React.forwardRef((props, ref) => {
-    const sortedGroupData = [...dataSigGroup].sort((a, b) => {
-      const isExtraA = a.row > 1000;
-      const isExtraB = b.row > 1000;
+    const buildCoverGroupsFromDataSig = () => {
+      if (!Array.isArray(dataSig) || dataSig.length === 0) return [];
 
-      if (isExtraA && !isExtraB) return 1;
-      if (!isExtraA && isExtraB) return -1;
+      const seatMap = new Map();
 
-      return a.row - b.row;
-    });
+      dataSig.forEach((item) => {
+        const seatLabel = String(item?.Seat || "").trim();
+        const studentId = String(item?.IdStd || "").trim();
 
-    const leftSortedGroup = sortedGroupData.slice(0, Math.ceil(sortedGroupData.length / 2));
-    const rightSortedGroup = sortedGroupData.slice(Math.ceil(sortedGroupData.length / 2));
+        if (!seatLabel) return;
+
+        if (!seatMap.has(seatLabel)) {
+          seatMap.set(seatLabel, []);
+        }
+
+        if (studentId) {
+          seatMap.get(seatLabel).push(studentId);
+        }
+      });
+
+      const result = [];
+
+      for (const [seatLabel, ids] of seatMap.entries()) {
+        const sortedIds = [...ids].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+
+        const isExtra =
+          seatLabel.includes("เสริม") ||
+          parseInt(seatLabel.replace(/\D/g, ""), 10) > 1000;
+
+        let rowNumber = 0;
+
+        if (seatLabel.includes("เสริม")) {
+          rowNumber = 1000 + (parseInt(seatLabel.replace(/\D/g, ""), 10) || 0);
+        } else {
+          rowNumber = parseInt(seatLabel.replace(/\D/g, ""), 10) || 0;
+        }
+
+        result.push({
+          row: rowNumber,
+          displayRow: isExtra
+            ? `แถวเสริม ${seatLabel.replace(/\D/g, "") || ""}`
+            : `แถว ${rowNumber}`,
+          range:
+            sortedIds.length > 0
+              ? `${sortedIds[0]} - ${sortedIds[sortedIds.length - 1]}`
+              : "",
+          count: sortedIds.length,
+          isExtra,
+        });
+      }
+
+      result.sort((a, b) => {
+        if (a.isExtra && !b.isExtra) return 1;
+        if (!a.isExtra && b.isExtra) return -1;
+        return a.row - b.row;
+      });
+
+      return result;
+    };
+
+    const coverGroups = buildCoverGroupsFromDataSig();
+
+    const leftSortedGroup = coverGroups.slice(0, Math.ceil(coverGroups.length / 2));
+    const rightSortedGroup = coverGroups.slice(Math.ceil(coverGroups.length / 2));
 
     return (
       <div ref={ref} className="cover-page" style={{ textAlign: "center" }}>
@@ -641,7 +693,7 @@ export function ExcelImportModal({ show, handleClose, onImportSuccess, datas }) 
             fontSize: "26pt",
             color:
               datas?.roomexam?.Etime &&
-              parseInt(datas.roomexam.Etime.split(":")[0], 10) >= 13
+                parseInt(datas.roomexam.Etime.split(":")[0], 10) >= 13
                 ? "red"
                 : "blue",
           }}
@@ -663,34 +715,65 @@ export function ExcelImportModal({ show, handleClose, onImportSuccess, datas }) 
           ห้องสอบ {datas?.rooms?.room_name || "No data"}
         </h3>
 
-        <div style={{ display: "flex", justifyContent: "space-between", width: "100%", gap: 10 }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            width: "100%",
+            gap: 10,
+          }}
+        >
           {[leftSortedGroup, rightSortedGroup].map((arr, colIdx) => (
             <div key={colIdx} style={{ flex: 1 }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  tableLayout: "fixed",
+                }}
+              >
+                <colgroup>
+                  <col style={{ width: "18%" }} />
+                  <col style={{ width: "55%" }} />
+                  <col style={{ width: "27%" }} />
+                </colgroup>
+
                 <thead>
                   <tr style={{ textAlign: "center", background: "#d9d9d9" }}>
                     <th style={{ border: "1px solid #ccc", fontSize: 18 }}>แถว</th>
-                    <th style={{ border: "1px solid #ccc", fontSize: 18, whiteSpace: "nowrap" }}>
+                    <th
+                      style={{
+                        border: "1px solid #ccc",
+                        fontSize: 18,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
                       รหัสประจำตัว
                     </th>
-                    <th style={{ border: "1px solid #ccc", fontSize: 18 }}>จำนวนนักศึกษา</th>
+                    <th style={{ border: "1px solid #ccc", fontSize: 18 }}>
+                      จำนวนนักศึกษา
+                    </th>
                   </tr>
                 </thead>
+
                 <tbody>
                   {arr.map((group, i) => (
-                    <tr key={i} style={{ background: i % 2 !== 0 ? "#d9d9d9" : "transparent" }}>
+                    <tr
+                      key={i}
+                      style={{ background: i % 2 !== 0 ? "#d9d9d9" : "transparent" }}
+                    >
                       <td
                         style={{
                           border: "1px solid #ccc",
                           fontSize: 16,
                           padding: "15px 5px",
                           whiteSpace: "nowrap",
+                          fontSize: group.displayRow.includes("เสริม") ? 12 : 16
                         }}
                       >
-                        {group.row > 1000
-                          ? `แถวเสริม ${group.row.toString().slice(3)}`
-                          : `แถว ${group.row}`}
+                        {group.displayRow}
                       </td>
+
                       <td
                         style={{
                           border: "1px solid #ccc",
@@ -701,6 +784,7 @@ export function ExcelImportModal({ show, handleClose, onImportSuccess, datas }) 
                       >
                         {group.range}
                       </td>
+
                       <td
                         style={{
                           border: "1px solid #ccc",

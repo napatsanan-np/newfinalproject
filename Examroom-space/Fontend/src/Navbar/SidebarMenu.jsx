@@ -74,6 +74,7 @@ const SidebarMenu = () => {
           { label: "สำรองข้อสอบ", path: "/Backup", icon: <Copy size={16} /> },
           { label: "ส่งข้อสอบโดยเจ้าหน้าที่ห้องข้อสอบ", path: "/Pageform", icon: <Send size={16} /> },
           { label: "ส่งข้อสอบโดยอาจารย์", path: "/PageformroleTeach", icon: <Send size={16} /> },
+          { label: "รับข้อสอบออนไลน์", path: "/ReceiveOnlineExam", icon: <Send size={16} /> },
         ],
       },
 

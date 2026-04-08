@@ -76,6 +76,10 @@ func SetupRoutes(r *gin.Engine, db *sql.DB) {
 		protected.POST("/DeleteTable/:ref", examController.Deltable)
 		protected.GET("/detailexaminnerjoinroomexam/:ref", examController.ShowData)
 		protected.POST("/Edit_DetailExam", examController.UpdateDetailExam)
+
+		protected.GET("/online-exam/pending", examController.GetPendingOnlineExam)
+		protected.PUT("/online-exam/receive", examController.ReceiveOnlineExam)
+
 		protected.POST("/New_Insert_Exam", examController.NewExam)
 		protected.GET("/select_data/:tablename/:ref", examController.ShowData)
 		protected.GET("/DataRoomexam", examController.FetchRoomExam)

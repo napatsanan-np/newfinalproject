@@ -33,6 +33,7 @@ const Sentform_roleteacher = () => {
   // ---------------- State หลัก ----------------
   const [Data, setData] = useState({
     Ref: "",
+    id_config: "",
     NoSt: "",
     submit: "ยังไม่ส่ง",
     sub_date: formattedDate,
@@ -268,7 +269,6 @@ const Sentform_roleteacher = () => {
   const handleIdChangeWithCourse = (selectedOption) => {
     handleRefChange(selectedOption.value);
   };
-
   const handleRefChange = (newRef) => {
     newRef = parseInt(newRef);
     const selectedCourse = dataE?.find((it) => parseInt(it.Ref) === newRef);
@@ -281,9 +281,11 @@ const Sentform_roleteacher = () => {
         .split(",")
         .map((t) => t.trim());
       const remarkText = selectedDetail?.remark || "";
+
       setData((prev) => ({
         ...prev,
         Ref: newRef,
+        id_config: selectedDetail?.id_config || prev.id_config || "",
         NoSt: selectedCourse.No_st || "-",
         Lecturer: lecturers[0] || "",
         eDate: selectedCourse.Edate || "-",
@@ -302,7 +304,7 @@ const Sentform_roleteacher = () => {
         answerbook_use: selectedDetail?.answerbook_use || "",
         fileexam: selectedDetail?.fileexam || [],
       }));
-      // ตั้งค่าหมายเหตุให้เข้ากับโหมด
+
       parseRemark(remarkText);
 
       setLecturerOptions(lecturers);
@@ -312,6 +314,7 @@ const Sentform_roleteacher = () => {
       setData((prev) => ({
         ...prev,
         Ref: newRef,
+        id_config: "",
         NoSt: "-",
         Lecturer: "",
         eDate: "-",
@@ -328,6 +331,7 @@ const Sentform_roleteacher = () => {
         answesheet: "",
         remark: "",
         answerbook_use: "",
+        fileexam: [],
       }));
       setLecturerOptions([]);
       setSelectedCourse(null);
@@ -337,6 +341,7 @@ const Sentform_roleteacher = () => {
       setA4PageCount("");
     }
   };
+
 
   const handleFileAdd = (e) => {
     const file = e.target.files[0];
@@ -395,8 +400,8 @@ const Sentform_roleteacher = () => {
         value === "เย็บมุมรวม"
           ? `1 ตอน(หน้า 1 - ${prev.page || ""})`
           : value === "เย็บแยกตอน"
-          ? prev.staple_apart
-          : "",
+            ? prev.staple_apart
+            : "",
     }));
 
     if (value === "เย็บมุมรวม") {
@@ -468,77 +473,91 @@ const Sentform_roleteacher = () => {
   };
 
   // ---------------- Submit ----------------
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setShowAlert(false);
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setShowAlert(false);
 
-    // สร้าง remark ให้เป็นข้อความสุดท้ายตามโหมด (กันลืม)
-    const finalRemark = resolveRemarkText(remarkMode, a4SheetCount, a4PageCount, Data.remark);
-    if (finalRemark !== Data.remark) {
-      setData((prev) => ({ ...prev, remark: finalRemark }));
+  const finalRemark = resolveRemarkText(
+    remarkMode,
+    a4SheetCount,
+    a4PageCount,
+    Data.remark
+  );
+
+  if (finalRemark !== Data.remark) {
+    setData((prev) => ({ ...prev, remark: finalRemark }));
+  }
+
+  if (!validateForm()) {
+    setShowAlert(true);
+    return;
+  }
+
+  if (!validateFiles()) return;
+
+  if (!Data.id_config) {
+    alert("ไม่พบ id_config กรุณาเลือกวิชาใหม่อีกครั้ง");
+    return;
+  }
+
+  try {
+    const formData = new FormData();
+
+    const computedSubmit =
+      noExam || Data.exam_type === "สอบนอกตาราง"
+        ? "มีสอบแต่ไม่มีข้อสอบส่ง"
+        : "รอการยืนยัน";
+
+    const dataToSend = {
+      Ref: Data.Ref,
+      id_config: Number(Data.id_config),
+      Lecturer: Data.Lecturer,
+      copy: Data.copy,
+      page: Data.page,
+      color: Data.color,
+      sub_date: Data.sub_date,
+      staple_conner: Data.staple_conner,
+      staple_apart: Data.staple_apart,
+      calculator: Data.calculator,
+      answesheet: Data.answesheet,
+      answerbook_use: Data.answerbook_use,
+      remark: finalRemark,
+      submit: computedSubmit,
+      exam_type: Data.exam_type,
+    };
+
+    formData.append("data", JSON.stringify(dataToSend));
+
+    const allowFiles = Data.exam_type === "สอบในตาราง" && !noExam;
+    if (allowFiles && Data.fileexam && Data.fileexam.length > 0) {
+      Data.fileexam.forEach((file) => formData.append("fileexam[]", file));
     }
 
-    if (!validateForm()) {
-      setShowAlert(true);
-      return;
-    }
-    if (!validateFiles()) return;
+    setData((prev) => ({ ...prev, submit: computedSubmit }));
 
-    try {
-      const formData = new FormData();
+    const response = await axios.post(
+      `${url}/teacher/Edit_DetailExam`,
+      formData,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data",
+        },
+        withCredentials: true,
+      }
+    );
 
-      const computedSubmit =
-        noExam || Data.exam_type === "สอบนอกตาราง"
-          ? "มีสอบแต่ไม่มีข้อสอบส่ง"
-          : "รอการยืนยัน";
-
-      const dataToSend = {
-        Ref: Data.Ref,
-        Lecturer: Data.Lecturer,
-        copy: Data.copy,
-        page: Data.page,
-        color: Data.color,
-        sub_date: Data.sub_date,
-        staple_conner: Data.staple_conner,
-        staple_apart: Data.staple_apart,
-        calculator: Data.calculator,
-        answesheet: Data.answesheet,
-        answerbook_use: Data.answerbook_use,
-        remark: resolveRemarkText(remarkMode, a4SheetCount, a4PageCount, Data.remark),
+    if (response.status === 200) {
+      setData((prev) => ({
+        ...prev,
         submit: computedSubmit,
         exam_type: Data.exam_type,
-      };
-      formData.append("data", JSON.stringify(dataToSend));
+      }));
 
-      const allowFiles = Data.exam_type === "สอบในตาราง" && !noExam;
-      if (allowFiles && Data.fileexam && Data.fileexam.length > 0) {
-        Data.fileexam.forEach((file) => formData.append("fileexam[]", file));
-      }
-
-      setData((prev) => ({ ...prev, submit: computedSubmit }));
-
-      const response = await axios.post(
-        `${url}/teacher/Edit_DetailExam`,
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "multipart/form-data",
-          },
-          withCredentials: true,
-        }
-      );
-
-      if (response.status === 200) {
-        setData((prev) => ({
-          ...prev,
-          submit: computedSubmit,
-          exam_type: Data.exam_type,
-        }));
-
-        await Promise.all([
-          mutateExamTable(),
-          mutateExamDetail((currentData) => {
+      await Promise.all([
+        mutateExamTable(),
+        mutateExamDetail(
+          (currentData) => {
             if (!currentData) return currentData;
             return currentData.map((item) =>
               item.Ref === Data.Ref
@@ -546,20 +565,30 @@ const Sentform_roleteacher = () => {
                     ...item,
                     submit: computedSubmit,
                     Lecturer: Data.Lecturer,
+                    id_config: Number(Data.id_config),
                   }
                 : item
             );
-          }, false),
-        ]);
+          },
+          false
+        ),
+      ]);
 
-        alert("บันทึกข้อมูลสำเร็จ");
-      }
-    } catch (error) {
-      console.error("Error submitting data:", error);
-      setData((prev) => ({ ...prev, submit: prev.submit }));
-      alert(`เกิดข้อผิดพลาดในการบันทึกข้อมูล: ${error.message}`);
+      alert("บันทึกข้อมูลสำเร็จ");
     }
-  };
+  } catch (error) {
+    console.error("Error submitting data:", error);
+
+    const errorMessage =
+      error?.response?.data?.error ||
+      error?.response?.data?.message ||
+      error.message ||
+      "เกิดข้อผิดพลาดในการบันทึกข้อมูล";
+
+    setData((prev) => ({ ...prev, submit: prev.submit }));
+    alert(`เกิดข้อผิดพลาดในการบันทึกข้อมูล: ${errorMessage}`);
+  }
+};
 
   const customStyles = {
     control: (provided) => ({
@@ -609,9 +638,9 @@ const Sentform_roleteacher = () => {
                       options={
                         Array.isArray(dataE)
                           ? dataE.map((item) => ({
-                              value: item.Ref,
-                              label: item.Course,
-                            }))
+                            value: item.Ref,
+                            label: item.Course,
+                          }))
                           : []
                       }
                       onChange={(opt) => {
@@ -641,8 +670,8 @@ const Sentform_roleteacher = () => {
                             isOtherSelected
                               ? { value: "other", label: "อื่นๆ" }
                               : Data.Lecturer
-                              ? { value: Data.Lecturer, label: Data.Lecturer }
-                              : null
+                                ? { value: Data.Lecturer, label: Data.Lecturer }
+                                : null
                           }
                           onChange={handleLecturerChange}
                           styles={customStyles}
@@ -694,10 +723,10 @@ const Sentform_roleteacher = () => {
                               exam_type: v,
                               ...(v === "สอบนอกตาราง"
                                 ? {
-                                    copy: "", page: "", staple_conner: "", staple_apart: "",
-                                    calculator: "", answesheet: "", answerbook_use: "",
-                                    fileexam: []
-                                  }
+                                  copy: "", page: "", staple_conner: "", staple_apart: "",
+                                  calculator: "", answesheet: "", answerbook_use: "",
+                                  fileexam: []
+                                }
                                 : {}),
                             }));
                           }}
@@ -933,20 +962,20 @@ const Sentform_roleteacher = () => {
 
                         {(Data.answesheet === "สมุดคำตอบ" ||
                           Data.answesheet === "กระดาษคอมพิวเตอร์") && (
-                          <Col md={3}>
-                            <BootstrapForm.Group controlId="answerbook_use" className="mb-3">
-                              <BootstrapForm.Label>จำนวนเล่มต่อ 1 คน</BootstrapForm.Label>
-                              <BootstrapForm.Control
-                                type="text" name="answerbook_use"
-                                value={Data.answerbook_use}
-                                onChange={handleAnswerBookCountChange}
-                                min="1"
-                                onKeyPress={(e) => { if (!/[0-9]/.test(e.key)) e.preventDefault(); }}
-                                inputMode="numeric" pattern="[0-9]*"
-                              />
-                            </BootstrapForm.Group>
-                          </Col>
-                        )}
+                            <Col md={3}>
+                              <BootstrapForm.Group controlId="answerbook_use" className="mb-3">
+                                <BootstrapForm.Label>จำนวนเล่มต่อ 1 คน</BootstrapForm.Label>
+                                <BootstrapForm.Control
+                                  type="text" name="answerbook_use"
+                                  value={Data.answerbook_use}
+                                  onChange={handleAnswerBookCountChange}
+                                  min="1"
+                                  onKeyPress={(e) => { if (!/[0-9]/.test(e.key)) e.preventDefault(); }}
+                                  inputMode="numeric" pattern="[0-9]*"
+                                />
+                              </BootstrapForm.Group>
+                            </Col>
+                          )}
                       </Row>
 
                       {/* หมายเหตุ (แบบใหม่) */}
@@ -957,12 +986,12 @@ const Sentform_roleteacher = () => {
                             remarkMode === "A4_BOTH"
                               ? "A4_BOTH"
                               : remarkMode === "A4_PAGES"
-                              ? "A4_PAGES"
-                              : ["นำกระดาษโน้ตห้องข้อสอบได้", "-"].includes(Data.remark)
-                              ? Data.remark
-                              : remarkMode === "CUSTOM"
-                              ? "other"
-                              : Data.remark || ""
+                                ? "A4_PAGES"
+                                : ["นำกระดาษโน้ตห้องข้อสอบได้", "-"].includes(Data.remark)
+                                  ? Data.remark
+                                  : remarkMode === "CUSTOM"
+                                    ? "other"
+                                    : Data.remark || ""
                           }
                           onChange={(e) => {
                             const v = e.target.value;

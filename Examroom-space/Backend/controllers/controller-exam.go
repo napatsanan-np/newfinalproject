@@ -1,5 +1,6 @@
 package controllers
 
+
 import (
 	"archive/zip"
 	"bytes"
@@ -11,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/models"
@@ -33,38 +35,63 @@ func (c *Controller) UpdateBackupExam(ctx *gin.Context) {
 }
 
 func (ctrl *Controller) UpdateDetailExam(c *gin.Context) {
-	// Parse the form data
-	if err := c.Request.ParseMultipartForm(10 << 20); err != nil { // Max file size 10MB
+
+	if err := c.Request.ParseMultipartForm(10 << 20); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Unable to parse form data"})
 		return
 	}
 
-	// Get the JSON data from the form
 	data := c.PostForm("data")
+
 	var formData models.ExamDetail
 	if err := json.Unmarshal([]byte(data), &formData); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON data"})
 		return
 	}
 
-	// Handle multiple file uploads for the field "fileexam[]"
 	files := c.Request.MultipartForm.File["fileexam[]"]
+
 	if len(files) > 0 {
 		for _, file := range files {
+
 			filePath := filepath.Join("./Exam-file", file.Filename)
+
 			if err := c.SaveUploadedFile(file, filePath); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to save file %s", file.Filename)})
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"error": fmt.Sprintf("Failed to save file %s", file.Filename),
+				})
 				return
 			}
+
 			formData.FileExam = append(formData.FileExam, filePath)
 		}
 	}
 
-	// Log the received data for demonstration
 	log.Printf("Received data: %+v", formData)
-	ctrl.Updateservice.Edit_DetailExam(formData)
 
-	c.JSON(http.StatusOK, gin.H{"message": "Data updated successfully"})
+	// ตรวจ id_config
+	if formData.IdConfig <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "id_config is required",
+		})
+		return
+	}
+
+	// เรียก service
+	if err := ctrl.Updateservice.Edit_DetailExam(formData); err != nil {
+
+		log.Println("UpdateDetailExam error:", err)
+
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
+		})
+
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Data updated successfully",
+	})
 }
 
 func (ctrl *Controller) GetFiles(c *gin.Context) {
@@ -150,4 +177,60 @@ func (ctrl *Controller) NewExam(c *gin.Context) {
 	fmt.Println("Param ::", data)
 	ctrl.Insertservice.InsertNewExam(data)
 	fmt.Println("del table")
+}
+
+
+func (ctrl *Controller) GetPendingOnlineExam(c *gin.Context) {
+	results, err := ctrl.Updateservice.GetPendingOnlineExam()
+	if err != nil {
+		log.Println("GetPendingOnlineExam error:", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, results)
+}
+
+func (ctrl *Controller) ReceiveOnlineExam(c *gin.Context) {
+	var req struct {
+		Ref      int    `json:"ref"`
+		IdConfig int    `json:"id_config"`
+		Receiver string `json:"receiver"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	if req.Ref <= 0 || req.IdConfig <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "ref and id_config are required",
+		})
+		return
+	}
+
+	if req.Receiver == "" {
+		req.Receiver = "เจ้าหน้าที่ห้องข้อสอบ"
+	}
+
+	now := time.Now()
+	subDate := fmt.Sprintf("%02d-%02d-%d", now.Day(), int(now.Month()), now.Year()+543)
+
+	err := ctrl.Updateservice.ReceiveOnlineExam(req.Ref, req.IdConfig, req.Receiver, subDate)
+	if err != nil {
+		log.Println("ReceiveOnlineExam error:", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "รับข้อสอบออนไลน์สำเร็จ",
+	})
 }

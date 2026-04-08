@@ -3,8 +3,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import Swal from "sweetalert2";
 import {
-  Tabs,
-  Tab,
   Table,
   Button,
   Form,
@@ -607,22 +605,11 @@ const DetailExam = () => {
     </>
   );
 };
-
 const EditImportedData = () => {
   return (
     <div>
       <h4 className="mb-3">แก้ไขข้อมูล</h4>
-      <Tabs defaultActiveKey="examtable" className="mb-3">
-        <Tab eventKey="examtable" title="ตารางสอบ">
-          <Examtable />
-        </Tab>
-        <Tab eventKey="roomexam" title="ห้องสอบ">
-          <Roomexam />
-        </Tab>
-        <Tab eventKey="detail" title="รายละเอียดข้อสอบ">
-          <DetailExam />
-        </Tab>
-      </Tabs>
+      <Examtable />
     </div>
   );
 };

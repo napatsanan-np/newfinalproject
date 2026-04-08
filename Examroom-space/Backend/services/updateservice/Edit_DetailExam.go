@@ -11,36 +11,66 @@ import (
 	"github.com/models"
 )
 
-func (s *Userupdateservice) Edit_DetailExam(data models.ExamDetail) {
-	// Start a transaction
-	tx, err := s.DB.Begin() // Begin a transaction
-	if err != nil {
-		log.Println("Error starting transaction:", err)
-		return
-	}
+func (s *Userupdateservice) GetCourse(ref int, idConfig int) string {
 
-	// Ensure the transaction is either committed or rolled back
-	defer func() {
-		if r := recover(); r != nil {
-			_ = tx.Rollback() // Rollback in case of a panic
-			log.Println("Transaction rolled back due to panic:", r)
-		}
-	}()
-
-	// Parse input JSON data
-	exam := (data)
-	configs, _ := s.GetConfig()
-	// Prepare the update query
-	log.Println("Filess::", exam.FileExam)
-	updateQuery := `
-		UPDATE public.detail_exam
-	SET submit=$1, sub_date=$2, copy=$3, page=$4, recive=$5, rec_date=$6, qty=$7, staple_conner=$8, staple_apart=$9,
-	    calculator=$10, answesheet=$11, answerbook_use=$12, remark=$13, color=$14, lecturer=$15 , files=$16, exam_type=$17
-	WHERE ref=$18 and id_config = $19;
+	query := `
+	SELECT course
+	FROM public.examtable
+	WHERE ref = $1 AND id_config = $2
+	LIMIT 1;
 	`
 
-	// Execute the update query within the transaction
-	_, err = tx.Exec(updateQuery,
+	var course string
+
+	err := s.DB.QueryRow(query, ref, idConfig).Scan(&course)
+
+	if err != nil {
+
+		log.Println("Error fetching course:", err)
+
+		return ""
+	}
+
+	return course
+}
+
+func (s *Userupdateservice) Edit_DetailExam(data models.ExamDetail) error {
+
+	tx, err := s.DB.Begin()
+
+	if err != nil {
+
+		return err
+	}
+
+	exam := data
+
+	updateQuery := `
+	UPDATE public.detail_exam
+	SET submit=$1,
+	sub_date=$2,
+	copy=$3,
+	page=$4,
+	recive=$5,
+	rec_date=$6,
+	qty=$7,
+	staple_conner=$8,
+	staple_apart=$9,
+	calculator=$10,
+	answesheet=$11,
+	answerbook_use=$12,
+	remark=$13,
+	color=$14,
+	lecturer=$15,
+	files=$16,
+	exam_type=$17
+	WHERE ref=$18 AND id_config=$19;
+	`
+
+	result, err := tx.Exec(
+
+		updateQuery,
+
 		exam.Submit,
 		exam.SubDate,
 		exam.Copy,
@@ -56,77 +86,115 @@ func (s *Userupdateservice) Edit_DetailExam(data models.ExamDetail) {
 		exam.Remark,
 		exam.Color,
 		exam.Lecturer,
-		pq.Array(exam.FileExam), // Convert array to PostgreSQL array format
+		pq.Array(exam.FileExam),
 		exam.ExamType,
 		exam.Ref,
-		configs[0].Id_config,
+		exam.IdConfig,
 	)
+
 	if err != nil {
+
+		tx.Rollback()
+
 		log.Println("Error executing update query:", err)
-		_ = tx.Rollback() // Rollback the transaction if there's an error
-		return
+
+		return err
 	}
 
-	// Fetch the latest exam configuration
-	sqlConfig := `
-		SELECT academic_year, semester, prep_period_start, prep_period_end, exam_period_start, exam_period_end
-		FROM public.exam_config
-		ORDER BY academic_year DESC, semester DESC
-		LIMIT 1;
-	`
-	row := tx.QueryRow(sqlConfig) // Use the transaction context for the query
-	var config models.ExamConfig
-	err = row.Scan(
-		&config.AcademicYear,
-		&config.Semester,
-		&config.PrepPeriodStart,
-		&config.PrepPeriodEnd,
-		&config.ExamPeriodStart,
-		&config.ExamPeriodEnd,
-	)
+	rowsAffected, err := result.RowsAffected()
+
 	if err != nil {
-		if err == sql.ErrNoRows {
-			log.Println("No exam configuration found.")
-		} else {
-			log.Println("Error scanning exam configuration:", err)
-		}
-		_ = tx.Rollback()
-		return
+
+		tx.Rollback()
+
+		return err
 	}
 
-	log.Printf("Fetched exam configuration: %+v\n", config)
+	if rowsAffected == 0 {
 
-	// Insert into exam_submission_history
-	insertQuery := `
-		INSERT INTO public.exam_submission_history (
-			id, semester, academic_year, course, page, submit, user_id, sub_date
-		) VALUES (DEFAULT, $1, $2, $3, $4, $5, $6, $7);
+		tx.Rollback()
+
+		return fmt.Errorf("detail_exam not found for ref=%d id_config=%d", exam.Ref, exam.IdConfig)
+	}
+
+	sqlConfig := `
+	SELECT academic_year, semester
+	FROM public.exam_config
+	WHERE id_config = $1
+	LIMIT 1;
 	`
 
-	_, err = tx.Exec(insertQuery,
-		config.Semester,
-		config.AcademicYear,
-		s.GetCourse(exam.Ref),
+	var academicYear string
+	var semester string
+
+	err = tx.QueryRow(sqlConfig, exam.IdConfig).Scan(
+		&academicYear,
+		&semester,
+	)
+
+	if err != nil {
+
+		tx.Rollback()
+
+		if err == sql.ErrNoRows {
+
+			return fmt.Errorf("exam_config not found")
+		}
+
+		return err
+	}
+
+	course := s.GetCourse(exam.Ref, exam.IdConfig)
+
+	insertQuery := `
+	INSERT INTO public.exam_submission_history (
+	semester,
+	academic_year,
+	course,
+	page,
+	submit,
+	user_id,
+	sub_date,
+	id_config
+	)
+	VALUES ($1,$2,$3,$4,$5,$6,$7,$8);
+	`
+
+	_, err = tx.Exec(
+
+		insertQuery,
+
+		semester,
+		academicYear,
+		course,
 		exam.Page,
 		exam.Submit,
-		(exam.Lecturer),
+		exam.Lecturer,
 		exam.SubDate,
+		exam.IdConfig,
 	)
+
 	if err != nil {
+
+		tx.Rollback()
+
 		log.Println("Error executing insert query:", err)
-		_ = tx.Rollback() // Rollback the transaction if there's an error
-		return
+
+		return err
 	}
 
-	// Commit the transaction
 	err = tx.Commit()
+
 	if err != nil {
-		log.Println("Error committing transaction:", err)
-		_ = tx.Rollback() // Rollback if commit fails
-		return
+
+		tx.Rollback()
+
+		return err
 	}
 
-	log.Println("Transaction committed successfully.")
+	log.Println("Data updated successfully")
+
+	return nil
 }
 
 func (s *Userupdateservice) Update_ExamConfigByYearSemester(data models.ExamConfig, academic_year string, semester string) error {
@@ -186,7 +254,6 @@ func (s *Userupdateservice) Update_ExamConfigByStatus(data models.ExamConfig) er
 	return nil
 }
 
-
 func (s *Userupdateservice) CheckUser(proctor string) string {
 	// Split the input string into parts
 	parts := strings.Split(proctor, " , ")
@@ -230,67 +297,36 @@ func (s *Userupdateservice) CheckUser(proctor string) string {
 
 }
 
-func (s *Userupdateservice) GetCourse(ref int) string {
-	// SQL query to fetch the course based on ref
-	config, _ := s.GetConfig()
-	sql := `
-		SELECT course 
-		FROM public.examtable 
-		WHERE ref = $1 
-		and id_config = $2 ORDER BY ref ASC  `
-
-	// Variable to store the course
-	var course string
-
-	// Execute the query and scan the result into the course variable
-	err := s.DB.QueryRow(sql, ref, config[0].Id_config).Scan(&course)
-	if err != nil {
-
-		// Handle other errors
-		return ""
-	}
-
-	return course
-}
-
 func (s *Userupdateservice) Update_RoleExamProctor(data models.User) error {
-	// Create the SQL update query
 	query := `
-		UPDATE public.user_role
-	SET  role_id= 'PROCTOREXAMROOOM'
-	WHERE user_id = $1 and role_id = 'PROCTOR';
+		INSERT INTO public.user_role (user_id, role_id)
+		VALUES ($1, 'PROCTOREXAMROOOM');
 	`
 
-	// Execute the update query
 	_, err := s.DB.Exec(query, data.UserID)
 	if err != nil {
-		log.Println("Error executing update query:", err)
+		log.Println("Error executing insert query:", err)
 		return err
 	}
 
-	// Return nil if the operation was successful
 	return nil
 }
 
 func (s *Userupdateservice) Update_Roleroctor(data models.User) error {
-	// Create the SQL update query
 	query := `
-		UPDATE public.user_role
-	SET  role_id= 'PROCTOR'
-	WHERE user_id = $1 and role_id = 'PROCTOREXAMROOOM';
+		DELETE FROM public.user_role
+		WHERE user_id = $1
+		  AND role_id = 'PROCTOREXAMROOOM';
 	`
-	//PROCTOR PROCTOREXAMROOOM
-	// Execute the update query
+
 	_, err := s.DB.Exec(query, data.UserID)
 	if err != nil {
-		log.Println("Error executing update query:", err)
+		log.Println("Error executing delete query:", err)
 		return err
 	}
 
-	// Return nil if the operation was successful
 	return nil
 }
-
 func (s *Userupdateservice) Update_RoomExam(data models.RoomExam) error {
 	// Create the SQL update query
 	query := `UPDATE roomexam SET room_id = $1 , seatrow = $2 WHERE no = $3 and id_config = $4 `
@@ -378,5 +414,202 @@ func (s *Userupdateservice) UpdateDepartment(id string, name string, deptCodes [
 		}
 	}
 
+	return nil
+}
+
+func (s *Userupdateservice) GetPendingOnlineExam() ([]map[string]interface{}, error) {
+	query := `
+		SELECT
+			de.ref,
+			de.id_config,
+			et.course,
+			COALESCE(de.lecturer, '') AS lecturer,
+			COALESCE(et.edate, '') AS edate,
+			COALESCE(et.etime, '') AS etime,
+			COALESCE(et.hr, '') AS hr,
+			COALESCE(et.no_st, '') AS no_st,
+			COALESCE(de.page, '') AS page,
+			COALESCE(de.copy, '') AS copy,
+			COALESCE(de.submit, '') AS submit,
+			COALESCE(de.exam_type, '') AS exam_type,
+			COALESCE(de.sub_date, '') AS sub_date,
+			COALESCE(
+				STRING_AGG(DISTINCT r.room_name, ', ')
+				FILTER (WHERE r.room_name IS NOT NULL AND r.room_name <> '-'),
+				'-'
+			) AS room_name
+		FROM public.detail_exam de
+		INNER JOIN public.examtable et
+			ON de.ref = et.ref
+			AND de.id_config = et.id_config
+		LEFT JOIN public.roomexam re
+			ON de.ref = re.ref
+			AND de.id_config = re.id_config
+		LEFT JOIN public.rooms r
+			ON re.room_id = r.room_id
+		WHERE de.submit = 'รอการยืนยัน'
+		GROUP BY
+			de.ref, de.id_config, et.course, de.lecturer,
+			et.edate, et.etime, et.hr, et.no_st,
+			de.page, de.copy, de.submit, de.exam_type, de.sub_date
+		ORDER BY de.ref ASC;
+	`
+
+	rows, err := s.DB.Query(query)
+	if err != nil {
+		log.Println("Error querying pending online exams:", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	results := []map[string]interface{}{}
+
+	for rows.Next() {
+		var ref int
+		var idConfig int
+		var course string
+		var lecturer string
+		var eDate string
+		var eTime string
+		var hr string
+		var noSt string
+		var page string
+		var copy string
+		var submit string
+		var examType string
+		var subDate string
+		var roomName string
+
+		err := rows.Scan(
+			&ref,
+			&idConfig,
+			&course,
+			&lecturer,
+			&eDate,
+			&eTime,
+			&hr,
+			&noSt,
+			&page,
+			&copy,
+			&submit,
+			&examType,
+			&subDate,
+			&roomName,
+		)
+		if err != nil {
+			log.Println("Error scanning pending online exam row:", err)
+			return nil, err
+		}
+
+		results = append(results, map[string]interface{}{
+			"ref":       ref,
+			"id_config": idConfig,
+			"course":    course,
+			"lecturer":  lecturer,
+			"eDate":     eDate,
+			"eTime":     eTime,
+			"hr":        hr,
+			"NoSt":      noSt,
+			"page":      page,
+			"copy":      copy,
+			"submit":    submit,
+			"exam_type": examType,
+			"sub_date":  subDate,
+			"room_name": roomName,
+		})
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return results, nil
+}
+
+func (s *Userupdateservice) ReceiveOnlineExam(ref int, idConfig int, receiver string, subDate string) error {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+
+	var page string
+	updateQuery := `
+		UPDATE public.detail_exam
+		SET submit = $1
+		WHERE ref = $2
+		  AND id_config = $3
+		  AND submit = 'รอการยืนยัน'
+		RETURNING page;
+	`
+
+	err = tx.QueryRow(updateQuery, "ส่งแล้ว", ref, idConfig).Scan(&page)
+	if err != nil {
+		tx.Rollback()
+		if err == sql.ErrNoRows {
+			return fmt.Errorf("ไม่พบรายการที่มีสถานะรอการยืนยันสำหรับ ref=%d id_config=%d", ref, idConfig)
+		}
+		log.Println("Error updating receive online exam:", err)
+		return err
+	}
+
+	sqlConfig := `
+		SELECT academic_year, semester
+		FROM public.exam_config
+		WHERE id_config = $1
+		LIMIT 1;
+	`
+
+	var academicYear string
+	var semester string
+
+	err = tx.QueryRow(sqlConfig, idConfig).Scan(&academicYear, &semester)
+	if err != nil {
+		tx.Rollback()
+		if err == sql.ErrNoRows {
+			return fmt.Errorf("exam_config not found")
+		}
+		return err
+	}
+
+	course := s.GetCourse(ref, idConfig)
+
+	insertHistoryQuery := `
+		INSERT INTO public.exam_submission_history (
+			semester,
+			academic_year,
+			course,
+			page,
+			submit,
+			user_id,
+			sub_date,
+			id_config
+		)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8);
+	`
+
+	_, err = tx.Exec(
+		insertHistoryQuery,
+		semester,
+		academicYear,
+		course,
+		page,
+		"ส่งแล้ว",
+		receiver,
+		subDate,
+		idConfig,
+	)
+	if err != nil {
+		tx.Rollback()
+		log.Println("Error inserting online receive history:", err)
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	log.Println("ReceiveOnlineExam updated successfully")
 	return nil
 }

@@ -30,6 +30,7 @@ const DetailExamForm = () => {
 
   const [Data, setData] = useState({
     Ref: "",
+    id_config: "",
     NoSt: "",
     submit: "ยังไม่ส่ง",
     sub_date: formattedDate,
@@ -54,6 +55,7 @@ const DetailExamForm = () => {
     fileexam: [],
     exam_type: "สอบในตาราง",
   });
+
 
   // ---------------------------
   // ส่วนสถานะ "หมายเหตุ" ที่เพิ่มใหม่
@@ -287,6 +289,7 @@ const DetailExamForm = () => {
       setData((prevData) => ({
         ...prevData,
         Ref: "",
+        id_config: "",
         NoSt: "-",
         Lecturer: "",
         eDate: "-",
@@ -338,6 +341,7 @@ const DetailExamForm = () => {
       setData((prevData) => ({
         ...prevData,
         Ref: refNumber,
+        id_config: selectedDetail?.id_config || prevData.id_config || "",
         NoSt: selectedCourse.No_st || "-",
         Lecturer: isSubmitted ? (selectedDetail?.Lecturer || lecturers[0] || "") : (lecturers[0] || ""),
         eDate: selectedCourse.Edate || "-",
@@ -365,6 +369,7 @@ const DetailExamForm = () => {
       setData((prevData) => ({
         ...prevData,
         Ref: refNumber,
+        id_config: "",
         NoSt: "-",
         Lecturer: "",
         eDate: "-",
@@ -388,7 +393,6 @@ const DetailExamForm = () => {
       setIsOtherSelected(false);
     }
   };
-
   const handleKeyPress = (e) => {
     const keyCode = e.keyCode || e.which;
     const keyValue = String.fromCharCode(keyCode);
@@ -519,7 +523,6 @@ const DetailExamForm = () => {
     e.preventDefault();
     setShowAlert(false);
 
-    // ประกอบข้อความ remark ให้แน่ใจก่อนส่ง
     const finalRemark = composeRemark(remarkChoice, remarkCount, Data.remark);
     if (finalRemark !== Data.remark) {
       setData((prev) => ({ ...prev, remark: finalRemark }));
@@ -530,10 +533,16 @@ const DetailExamForm = () => {
       return;
     }
 
+    if (!Data.id_config) {
+      alert("ไม่พบ id_config กรุณาเลือกวิชาใหม่อีกครั้ง");
+      return;
+    }
+
     try {
       const formData = new FormData();
       const dataToSend = {
         Ref: Data.Ref,
+        id_config: Number(Data.id_config),
         Lecturer: Data.Lecturer,
         copy: Data.copy,
         page: Data.page,
@@ -544,8 +553,8 @@ const DetailExamForm = () => {
         calculator: Data.calculator,
         answesheet: Data.answesheet,
         answerbook_use: Data.answerbook_use,
-        remark: finalRemark, // ใช้ remark ที่ประกอบแล้ว
-        submit: noExam ? "มีสอบแต่ไม่มีข้อสอบส่ง" : "รอการยืนยัน",
+        remark: finalRemark,
+        submit: "ส่งแล้ว",
         exam_type: Data.exam_type,
       };
 
@@ -558,34 +567,52 @@ const DetailExamForm = () => {
       }
 
       const response = await axios.post(`${url}/Edit_DetailExam`, formData, {
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data",
+        },
         withCredentials: true,
       });
 
       if (response.status === 200) {
-        const newStatus =
-          Data.exam_type === "สอบนอกตาราง"
-            ? "มีสอบแต่ไม่มีข้อสอบส่ง"
-            : noExam
-              ? "มีสอบแต่ไม่มีข้อสอบส่ง"
-              : "ส่งแล้ว";
+       const newStatus = "ส่งแล้ว";
 
-        setData((prevData) => ({ ...prevData, submit: newStatus, exam_type: Data.exam_type }));
+        setData((prevData) => ({
+          ...prevData,
+          submit: newStatus,
+          exam_type: Data.exam_type,
+        }));
 
         await Promise.all([
           mutateExamTable(),
-          mutateExamDetail((currentData) => {
-            if (!currentData) return currentData;
-            return currentData.map((item) =>
-              item.Ref === Data.Ref ? { ...item, submit: newStatus, Lecturer: Data.Lecturer } : item
-            );
-          }, false),
+          mutateExamDetail(
+            (currentData) => {
+              if (!currentData) return currentData;
+              return currentData.map((item) =>
+                item.Ref === Data.Ref
+                  ? {
+                    ...item,
+                    submit: newStatus,
+                    Lecturer: Data.Lecturer,
+                    id_config: Number(Data.id_config),
+                  }
+                  : item
+              );
+            },
+            false
+          ),
         ]);
 
         alert("บันทึกข้อมูลสำเร็จ");
       }
     } catch (error) {
-      alert(`เกิดข้อผิดพลาดในการบันทึกข้อมูล: ${error.message}`);
+      const errorMessage =
+        error?.response?.data?.error ||
+        error?.response?.data?.message ||
+        error.message ||
+        "เกิดข้อผิดพลาดในการบันทึกข้อมูล";
+
+      alert(`เกิดข้อผิดพลาดในการบันทึกข้อมูล: ${errorMessage}`);
     }
   };
 

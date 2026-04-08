@@ -52,16 +52,10 @@ module.exports = defineConfig({
   ],
 
   // ถ้ามี frontend ต้องเปิดก่อนเทส ให้ Playwright เปิดเอง
- ...(isCI
-    ? {}
-    : {
-        webServer: {
-          command:
-            process.env.PLAYWRIGHT_WEB_SERVER_COMMAND ||
-            "npm run dev -- --host --port 3000",
-          url: process.env.WEB_BASE_URL || "http://localhost:3000",
-          reuseExistingServer: true,
-          timeout: 120_000,
-        },
-      }),
+  webServer: {
+    command: process.env.PLAYWRIGHT_WEB_SERVER_COMMAND || "npm run dev -- --host --port 3000",
+    url: process.env.WEB_BASE_URL || "http://localhost:3000",
+    reuseExistingServer: !isCI,
+    timeout: 120_000,
+  },
 });

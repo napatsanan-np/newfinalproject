@@ -26,24 +26,16 @@ import ProctorReport from "./Report/ProctorReport.jsx";
 import HomeTeacher from "./Exam/SentForm/HomeTeacher.jsx";
 import AuthCallback from "../Auth.jsx";
 import ActivityLogs from "./Report/ActivityLogs.jsx";
+import ReceiveOnlineExam from "./Exam/SentForm/ReceiveOnlineExam.jsx";
 
 const isAuthenticated = () => !!localStorage.getItem("token");
 
 
-// localStorage.setItem('API', "http://localhost:8080/api")
-// window.User = JSON.parse(localStorage.getItem('user'));
-// console.log(localStorage.getItem('API'));
-
-
-const DEFAULT_API = "https://projectsuperend-production.up.railway.app/api";
-
-
-if (!localStorage.getItem("API")) {
-  localStorage.setItem("API", DEFAULT_API);
-}
-
+localStorage.setItem('API', "http://localhost:8080/api")
 window.User = JSON.parse(localStorage.getItem('user'));
-console.log("API:", localStorage.getItem('API'));
+console.log(localStorage.getItem('API'));
+
+
 
 /**localStorage.setItem('API', "https://exam.sc.su.ac.th/api")  
 window.User = JSON.parse(localStorage.getItem('user'));
@@ -145,6 +137,10 @@ const router = createBrowserRouter([
   {
     path: "/report/activity-logs",
     element: <ProtectRoutes element={<ActivityLogs />} />,
+  },
+  {
+    path: "/ReceiveOnlineExam",
+    element: <ProtectRoutes element={<ReceiveOnlineExam />} />,
   },
 ]);
 

@@ -22,14 +22,13 @@ type SeatPlanPayload struct {
 	ExtraRowSize int   `json:"extra_row_size"`
 }
 
-
 // Room model
 type Room struct {
-	RoomID   string `json:"room_id"`
-	RoomName string `json:"room_name"`
-	Capacity int    `json:"capacity"`
-	RoomType string `json:"room_type"`
-	SeatPlan *SeatPlanPayload `json:"seat_plan,omitempty"` 
+	RoomID   string           `json:"room_id"`
+	RoomName string           `json:"room_name"`
+	Capacity int              `json:"capacity"`
+	RoomType string           `json:"room_type"`
+	SeatPlan *SeatPlanPayload `json:"seat_plan,omitempty"`
 }
 
 type FormData struct {
@@ -49,11 +48,11 @@ type FormData struct {
 	Remark        string   `json:"Remark"`
 	Color         string   `json:"Color"`
 	FileExam      []string `json:"fileexam"` // รองรับไฟล์ที่เป็น array
-
 }
 
 type ExamDetail struct {
 	Ref           int      `json:"Ref"`
+	IdConfig      int      `json:"id_config"`
 	Submit        string   `json:"submit"`
 	SubDate       string   `json:"sub_date"`
 	Copy          string   `json:"copy"`
@@ -70,7 +69,7 @@ type ExamDetail struct {
 	Color         string   `json:"color"`
 	Lecturer      string   `json:"Lecturer"`
 	No_st         string   `json:"No_st"`
-	FileExam      []string `json:"files"` // รองรับไฟล์ที่เป็น array
+	FileExam      []string `json:"fileexam"`
 	ExamType      string   `json:"exam_type"`
 }
 
@@ -125,13 +124,12 @@ type UserRole struct {
 }
 
 // ProctorAssignment model
-// ProctorAssignment model
 type ProctorAssignment struct {
 	ID       int    `json:"id"`
 	UserID   string `json:"user_id"`
 	Ref      int    `json:"ref"`
 	Date     string `json:"date"`
-	No       int    `json:"no"` // ตรวจสอบว่าตัวเล็กหรือตัวใหญ่
+	No       int    `json:"no"`
 	IdConfig int    `json:"id_config"`
 }
 
@@ -152,6 +150,7 @@ type ExamConfig struct {
 // ExamSubmissionHistory model
 type ExamSubmissionHistory struct {
 	ID           int    `json:"id"`
+	IdConfig     int    `json:"id_config"`
 	Semester     string `json:"semester"`
 	AcademicYear string `json:"academic_year"`
 	Course       string `json:"course"`
