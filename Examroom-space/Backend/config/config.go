@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -13,26 +14,28 @@ import (
 
 func Connect() (*sql.DB, error) {
 
-	connStr := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=disable",
-		os.Getenv("POSTGRES_USER"),
-		os.Getenv("POSTGRES_PASSWORD"),
-		os.Getenv("POSTGRES_DB"),
-		os.Getenv("POSTGRES_HOST"),
-		os.Getenv("POSTGRES_PORT"),
-	)
+	dbURL := os.Getenv("DATABASE_URL")
 
-	db, err := sql.Open("postgres", connStr)
+	if dbURL == "" {
+		return nil, fmt.Errorf("DATABASE_URL is not set")
+	}
+
+	// 🔥 สำคัญ: Render ต้องใช้ SSL
+	if !strings.Contains(dbURL, "sslmode") {
+		dbURL += "?sslmode=require"
+	}
+
+	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open a DB connection: %w", err)
-
+		return nil, fmt.Errorf("failed to open DB: %w", err)
 	}
 
-	// Verify the connection is valid
+	// Verify connection
 	if err := db.Ping(); err != nil {
-		return nil, fmt.Errorf("failed to ping DB: %w ", err)
+		return nil, fmt.Errorf("failed to ping DB: %w", err)
 	}
 
-	// Connection Pool Settings
+	// Connection Pool
 	maxOpenConns := getEnvAsInt("DB_MAX_OPEN_CONNS", 25)
 	maxIdleConns := getEnvAsInt("DB_MAX_IDLE_CONNS", 10)
 	connLifetimeMinutes := getEnvAsInt("DB_CONN_LIFETIME_MINUTES", 5)
@@ -46,7 +49,6 @@ func Connect() (*sql.DB, error) {
 	return db, nil
 }
 
-// Helper function to get environment variable as int with default value
 func getEnvAsInt(name string, defaultVal int) int {
 	valueStr := os.Getenv(name)
 	if value, err := strconv.Atoi(valueStr); err == nil {
@@ -54,9 +56,10 @@ func getEnvAsInt(name string, defaultVal int) int {
 	}
 	return defaultVal
 }
+
 func init() {
 	err := godotenv.Load()
 	if err != nil {
-		fmt.Println("Warning: No .env file found")
+		fmt.Println("Warning: No .env file found (expected in production)")
 	}
 }
