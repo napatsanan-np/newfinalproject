@@ -83,7 +83,7 @@ func (s *UseInsertService) ReplaceExamStudents(ctx context.Context, meta Meta, r
 			return err
 		}
 
-		// ❌ ตัด imported_by ออกแล้ว
+		//  ตัด imported_by ออกแล้ว
 		stmt, err2 := tx.PrepareContext(ctx, `
 			INSERT INTO exam_students
 			  (id_config, room_id, course, student_id, student_name, dep, seat_no)

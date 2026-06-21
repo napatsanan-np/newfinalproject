@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/config"
@@ -13,37 +12,24 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SecurityHeaders(frontendURL, backendURL string) gin.HandlerFunc {
+func SecurityHeaders() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		connectSrc := []string{
-			"'self'",
-			"http://localhost:8080",
-			"http://localhost:5173",
-		}
+		// อัพเดท CSP
+		c.Header("Content-Security-Policy",
+			"default-src 'self'; "+
+				"script-src 'self' 'unsafe-inline' 'unsafe-eval'; "+
+				"style-src 'self' 'unsafe-inline'; "+
+				"img-src 'self' data: blob: https:; "+
+				"font-src 'self' data:; "+
+				"connect-src 'self' http://localhost:8080 http://localhost:3000/ "+
+				"media-src 'self'; "+
+				"object-src 'none'; "+
+				"child-src 'self'; "+
+				"frame-ancestors 'none'; "+
+				"form-action 'self'; "+
+				"base-uri 'self';")
 
-		if frontendURL != "" {
-			connectSrc = append(connectSrc, frontendURL)
-		}
-		if backendURL != "" {
-			connectSrc = append(connectSrc, backendURL)
-		}
-
-		csp := "default-src 'self'; " +
-			"script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
-			"style-src 'self' 'unsafe-inline'; " +
-			"img-src 'self' data: blob: https:; " +
-			"font-src 'self' data:; " +
-			"connect-src " + strings.Join(connectSrc, " ") + "; " +
-			"media-src 'self'; " +
-			"object-src 'none'; " +
-			"child-src 'self'; " +
-			"frame-ancestors 'none'; " +
-			"form-action 'self'; " +
-			"base-uri 'self';"
-
-		c.Header("Content-Security-Policy", csp)
-
-		// Security headers
+		// เพิ่ม Security Headers
 		c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		c.Header("X-Frame-Options", "DENY")
 		c.Header("X-Content-Type-Options", "nosniff")
@@ -54,7 +40,7 @@ func SecurityHeaders(frontendURL, backendURL string) gin.HandlerFunc {
 		c.Header("Cross-Origin-Opener-Policy", "same-origin")
 		c.Header("Cross-Origin-Resource-Policy", "same-origin")
 
-		// Hide server info
+		// ลบ headers ที่อาจเปิดเผยข้อมูล
 		c.Header("Server", "")
 		c.Header("X-Powered-By", "")
 
@@ -63,7 +49,7 @@ func SecurityHeaders(frontendURL, backendURL string) gin.HandlerFunc {
 }
 
 func main() {
-	// DB connection
+	// Initialize database connection with connection pooling
 	db, err := config.Connect()
 	if err != nil {
 		fmt.Printf("Failed to connect to database: %v\n", err)
@@ -71,45 +57,28 @@ func main() {
 	}
 	defer db.Close()
 
+	// Test database connection
 	if err := db.Ping(); err != nil {
 		fmt.Printf("Failed to ping database: %v\n", err)
 		os.Exit(1)
 	}
 	fmt.Println("Database connected successfully with connection pooling")
 
-	environment := os.Getenv("ENVIRONMENT")
-	if environment == "production" {
-		gin.SetMode(gin.ReleaseMode)
-	} else {
-		gin.SetMode(gin.DebugMode)
-	}
-
+	gin.SetMode(gin.DebugMode)
 	r := gin.New()
 	r.Use(gin.Logger())
+	r.Use(SecurityHeaders())
 	r.Use(CustomRecovery())
 
-	frontendPublicURL := os.Getenv("FRONTEND_PUBLIC_URL")
-	backendPublicURL := os.Getenv("BACKEND_PUBLIC_URL")
-
-	r.Use(SecurityHeaders(frontendPublicURL, backendPublicURL))
-
-	// CORS origins
-	corsOriginsEnv := os.Getenv("CORS_ORIGINS")
-	allowedOrigins := []string{"http://localhost:5173"}
-
-	if corsOriginsEnv != "" {
-		rawOrigins := strings.Split(corsOriginsEnv, ",")
-		allowedOrigins = []string{}
-		for _, origin := range rawOrigins {
-			origin = strings.TrimSpace(origin)
-			if origin != "" {
-				allowedOrigins = append(allowedOrigins, origin)
-			}
-		}
+	host := os.Getenv("URL_FONTEND")
+	if host == "" {
+		fmt.Println("Warning: URL_FONTEND is not set. Using default localhost.")
+		host = "http://localhost:5173"
 	}
 
+	// อัพเดท CORS configuration
 	r.Use(cors.New(cors.Config{
-		AllowOrigins: allowedOrigins,
+		AllowOrigins: []string{host},
 		AllowMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders: []string{
 			"Origin",
@@ -127,21 +96,30 @@ func main() {
 		AllowFiles:       false,
 	}))
 
-	// Routes
+	// Security Headers middleware
+
+	// Rate limiting middleware (ถ้าต้องการ)
+	// r.Use(ratelimit.RateLimiter(time.Second, 100))
+
+	// ตั้งค่า Routes with database connection
 	routes.SetupRoutes(r, db)
 
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
+	fmt.Println("รันที่ DNS ::: " + host)
 
-	fmt.Printf("Server starting on port %s\n", port)
-	fmt.Printf("ENVIRONMENT=%s\n", environment)
-	fmt.Printf("CORS_ORIGINS=%v\n", allowedOrigins)
-
-	if err := r.Run(":" + port); err != nil {
-		fmt.Printf("Failed to start server: %v\n", err)
-		os.Exit(1)
+	// Environment-based server configuration
+	if os.Getenv("ENVIRONMENT") == "production" {
+		// Production settings
+		cert := os.Getenv("SSL_CERT_PATH")
+		key := os.Getenv("SSL_KEY_PATH")
+		if cert != "" && key != "" {
+			r.RunTLS(":443", cert, key)
+		} else {
+			fmt.Println("Warning: SSL certificate paths not set. Running without TLS.")
+			r.Run(":8080")
+		}
+	} else {
+		// Development settings
+		r.Run(":8080")
 	}
 }
 
@@ -154,7 +132,6 @@ func CustomRecovery() gin.HandlerFunc {
 				c.JSON(500, gin.H{
 					"error": "Internal Server Error",
 				})
-				c.Abort()
 			}
 		}()
 		c.Next()
