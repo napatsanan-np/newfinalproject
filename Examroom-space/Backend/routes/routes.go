@@ -25,12 +25,11 @@ func SetupRoutes(r *gin.Engine, db *sql.DB) {
 
 	// Public routes (no authentication required)
 	r.POST("/api/login", examController.Login)
+
 	r.GET("/api/sso/login", examController.LoginHandler)
 	r.GET("/api/callback", examController.CallbackHandler)
 	// Health check (สำหรับ test / docker / k8s)
-	r.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok"})
-	})
+	
 	// Protected routes ConditionWithproctor //UpdateBackupExam
 
 	//--------------------------------------------------------------(อาจารย์)--------------------------------------------------------------------------------------------------------------------------------------

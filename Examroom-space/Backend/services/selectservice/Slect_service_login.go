@@ -1,7 +1,6 @@
 package selectservice
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -212,118 +211,110 @@ func (c *UserSelectService) generateUserID() (string, error) {
 	return newID, nil
 }
 
-func (s *UserSelectService) LoginSso(data map[string]interface{}) (*LoginResponses, int, error) {
-	ctx := context.Background()
+func (s *UserSelectService) LoginSso(data map[string]interface{}) (*LoginResponse, int, error) {
 
-	userID, ok := data["azure_user_id"].(string)
-	if !ok || userID == "" {
-		log.Println("Missing or invalid oid in claims:", data)
-		return nil, http.StatusBadRequest, errors.New("missing or invalid oid")
+	var user models.User
+
+	oid, _ := data["oid"].(string)
+	username, _ := data["preferred_username"].(string)
+	fullName, _ := data["name"].(string)
+
+	if oid == "" || username == "" {
+		return nil, http.StatusUnauthorized, errors.New("invalid azure claims")
 	}
 
-	username, _ := data["username"].(string)
-	fullName, _ := data["full_name"].(string)
-	department, _ := data["department"].(int)
-	email, _ := data["email"].(string)
-	log.Println()
-	//   Log ตรวจ user
-	log.Println("username:", username, "| fullName:", fullName, "| department:", department, "| email:", email, "|azure_user_id", userID)
+	// หา user จาก oid
+	err := s.DB.QueryRow(`
+		SELECT user_id, username, full_name, department
+		FROM users
+		WHERE oid = $1
+	`, oid).Scan(&user.UserID, &user.Username, &user.FullName, &user.Department)
 
-	var exists bool
+	if err == sql.ErrNoRows {
 
-	likePattern := "%" + fullName + "%"
-	err := s.DB.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM users WHERE full_name ILIKE $1)", likePattern).Scan(&exists)
-	if err != nil {
-		log.Println("  Failed to check user existence:", err)
+		// หา user เก่าจาก username
+		err = s.DB.QueryRow(`
+			SELECT user_id, username, full_name, department
+			FROM users
+			WHERE LOWER(username) = LOWER($1)
+		`, username).Scan(&user.UserID, &user.Username, &user.FullName, &user.Department)
+
+		if err == sql.ErrNoRows {
+
+			// create user ใหม่
+			newID, err := s.generateUserID()
+			if err != nil {
+				return nil, http.StatusInternalServerError, err
+			}
+
+			_, err = s.DB.Exec(`
+				INSERT INTO users (user_id, username, full_name, oid)
+				VALUES ($1,$2,$3,$4)
+			`, newID, username, fullName, oid)
+
+			if err != nil {
+				return nil, http.StatusInternalServerError, err
+			}
+
+			user = models.User{
+				UserID:   newID,
+				Username: username,
+				FullName: fullName,
+			}
+
+		} else if err == nil {
+
+			// bind oid ให้ user เดิม
+			_, err = s.DB.Exec(`
+				UPDATE users SET oid=$1 WHERE user_id=$2
+			`, oid, user.UserID)
+
+			if err != nil {
+				return nil, http.StatusInternalServerError, err
+			}
+
+		} else {
+			return nil, http.StatusInternalServerError, err
+		}
+
+	} else if err != nil {
 		return nil, http.StatusInternalServerError, err
 	}
-	log.Println("exists::", exists)
-	if !exists {
-		//  ถ้าไม่พบชื่อในระบบและหา oid ไม่เจอ  ก็ให้ ----> insert ข้อมูลใหม่ทั้ง (กรณีไม่พบผู้ใช้)
-		//  ถ้าไม่พบชื่อในระบบและหา oid เจอ  ก็ให้ ----> update ข้อมูลใหม่ ผ่าน oid (กรณีผู้ใช้เปลี่ยนชื่อ)
-		var checkOid bool
-		likePatternOID := "%" + userID + "%"
-		log.Println("likePatternOID::", likePatternOID)
-		err := s.DB.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM users WHERE azure_user_id ILIKE $1)", likePatternOID).Scan(&checkOid)
-		log.Println("checkOid::", checkOid)
-		if err != nil {
-			log.Println("  Failed to check user existence:", err)
-			return nil, http.StatusInternalServerError, err
-		}
-		if checkOid { //  ถ้าไม่พบชื่อในระบบและหา oid เจอ ก็ให้ ----> update ข้อมูลใหม่ ผ่าน oid (กรณีผู้ใช้เปลี่ยนชื่อ)
-			_, err = s.DB.ExecContext(ctx, `
-			update users set username = $1 , full_name = $2 , department = $3 , email = $4 where azure_user_id = $5;
-		`, username, fullName, department, email, userID)
-			if err != nil {
-				log.Println("  Failed to update:", err)
-				return nil, http.StatusInternalServerError, err
-			}
-			//log.Println("  Inserted new user:", username)
 
-		} else { //  ถ้าไม่พบชื่อในระบบและหา oid ไม่เจอ  ก็ให้ ----> insert ข้อมูลใหม่ทั้ง (กรณีไม่พบผู้ใช้)
-			UID, _ := s.generateUserID()
-			_, err = s.DB.ExecContext(ctx, `
-			INSERT INTO users (user_id, username, full_name, department , azure_user_id , email) 
-			VALUES ($1, $2, $3, $4 , $5 , $6)
-		`, UID, username, fullName, department, userID, email)
-			if err != nil {
-				log.Println("  Failed to insert new user:", err)
-				return nil, http.StatusInternalServerError, err
-			}
-		}
+	// -------- get roles --------
+	rows, err := s.DB.Query(`
+		SELECT rt.role_name
+		FROM user_role ur
+		JOIN role_type rt ON ur.role_id = rt.role_id
+		WHERE ur.user_id = $1
+	`, user.UserID)
 
-	} else {
-		// ถ้าพบชื่อในระบบ แต่ oid เป็น null ให้ update oid email ผ่าน full_name
-		log.Println("Case :: ถ้าพบชื่อในระบบ แต่ oid เป็น null ให้ update oid email ผ่าน full_name", email, userID, fullName)
-		_, err = s.DB.ExecContext(ctx, `
-			update users set email = $1 , azure_user_id = $2 where full_name ILIKE $3
-		`, email, userID, fullName)
-		if err != nil {
-			log.Println("  Failed to update:", err)
-			return nil, http.StatusInternalServerError, err
-		}
-	}
-
-	//   Log ตรวจ role
-	rows, err := s.DB.QueryContext(ctx, `
-	SELECT  role_type.role_name FROM public.user_role inner join role_type on role_type.role_id = user_role.role_id where user_id = 
-	(SELECT user_id FROM users WHERE full_name ILIKE $1) ;
-
-	`, likePattern)
 	if err != nil {
-		log.Println("  Failed to query user roles:", err)
 		return nil, http.StatusInternalServerError, err
 	}
 	defer rows.Close()
 
-	var roles []string
+	roles := []string{}
 	for rows.Next() {
-		var roleName string
-		if err := rows.Scan(&roleName); err != nil {
-			log.Println("  Failed to scan role:", err)
-			return nil, http.StatusInternalServerError, err
+		var role string
+		if err := rows.Scan(&role); err == nil {
+			roles = append(roles, role)
 		}
-		roles = append(roles, roleName)
 	}
-	log.Println("  Roles:", roles)
 
-	data["roles"] = roles
-	log.Println("  Role:", roles)
+	if len(roles) == 0 {
+		return nil, http.StatusForbidden, errors.New("user has no role")
+	}
 
+	// ใช้ generateToken ตัวเดิม
+	token, err := generateToken(user, roles)
 	if err != nil {
-		log.Println("  Failed to generate JWT token:", err)
 		return nil, http.StatusInternalServerError, err
 	}
 
-	token, err := generateTokenFromAzureClaims(data, roles)
-	//log.Println("  JWT Token generated:", token)
-	if err != nil {
-		log.Println("  Failed to generate JWT token:", err)
-		return nil, http.StatusInternalServerError, err
-	}
-
-	return &LoginResponses{
+	return &LoginResponse{
 		Token: token,
-		User:  data,
+		User:  user,
+		Roles: roles,
 	}, http.StatusOK, nil
 }

@@ -114,6 +114,10 @@ const router = createBrowserRouter([
     path: "/Home",
     element: <ProtectRoutes element={<App />} />,
   },
+    {
+    path: "/auth/callback",
+    element: <AuthCallback/> ,
+  },
   {
     path: "/auth/callback",
     element: <AuthCallback />,

@@ -27,9 +27,12 @@ func (ctrl *Controller) LoginHandler(c *gin.Context) {
 	state := generateRandomState() //   ปลอดภัยกว่า hardcoded
 
 	// แนะนำ: เก็บ state ลง session หรือ cookie เพื่อตรวจสอบภายหลัง
-	// c.SetCookie("oauth_state", state, 300, "/", "yourdomain.com", true, true)
+	c.SetCookie("oauth_state", state, 300, "/", "exam.sc.su.ac.th", true, true)
 	log.Println("STATE", state)
-	url := Oauth2Config.AuthCodeURL(state, oauth2.AccessTypeOffline)
+	url := Oauth2Config.AuthCodeURL(
+		"state-token",
+		oauth2.SetAuthURLParam("prompt", "login"),
+	)
 	c.Redirect(http.StatusFound, url)
 }
 
@@ -50,6 +53,7 @@ func (ctrl *Controller) InitSSO() {
 	providerURL := "https://login.microsoftonline.com/" + tenantID + "/v2.0"
 	log.Println("  REDIRECT_URL =", redirectURL)
 	log.Println("  CLIENT_ID =", clientID)
+	log.Println("  clientSecret =", clientSecret)
 	//  Init OIDC provider
 	ctx := context.Background()
 	provider, err := oidc.NewProvider(ctx, providerURL)
@@ -74,6 +78,7 @@ func (ctrl *Controller) InitSSO() {
 }
 
 func (ctrl *Controller) CallbackHandler(c *gin.Context) {
+
 	ctx := context.Background()
 
 	code := c.Query("code")
@@ -81,6 +86,7 @@ func (ctrl *Controller) CallbackHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "code is missing"})
 		return
 	}
+	log.Println("code :::", code)
 
 	token, err := Oauth2Config.Exchange(ctx, code)
 	if err != nil {
@@ -90,6 +96,7 @@ func (ctrl *Controller) CallbackHandler(c *gin.Context) {
 		})
 		return
 	}
+	log.Println("token :::", token)
 
 	//   ดึง id_token
 	rawIDToken, ok := token.Extra("id_token").(string)
@@ -97,7 +104,7 @@ func (ctrl *Controller) CallbackHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "id_token not found"})
 		return
 	}
-
+	log.Println("rawIDToken :::", rawIDToken)
 	//   ตรวจสอบ token ด้วย verifier
 	idToken, err := OidcVerifier.Verify(ctx, rawIDToken)
 	if err != nil {
@@ -107,7 +114,8 @@ func (ctrl *Controller) CallbackHandler(c *gin.Context) {
 		})
 		return
 	}
-	log.Println("id_token>:::", idToken)
+	log.Println("id_token :::", idToken)
+	// --------------------- เริ่มแก้จากตรงนี้------------------------
 	//   decode claims จาก id_token
 	var claims struct {
 		Oid               string `json:"oid"`
@@ -127,9 +135,10 @@ func (ctrl *Controller) CallbackHandler(c *gin.Context) {
 		"name":               claims.Name,
 		"preferred_username": claims.PreferredUsername,
 	}
-	log.Println("  Claims:", claimsMap)
+	log.Println("Claims:", claimsMap)
 
 	//   ส่งไปสร้าง JWT ของระบบเอง
+
 	appToken, _, err := ctrl.SelectService.LoginSso(claimsMap)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate JWT"})
@@ -139,13 +148,14 @@ func (ctrl *Controller) CallbackHandler(c *gin.Context) {
 	//   ส่งกลับ token + user info
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Login successful",
+		"status":  true,
 		"token":   appToken.Token,
 		"user": gin.H{
-			"full_name":     appToken.User["full_name"],
-			"username":      appToken.User["username"],
-			"Azure_user_ID": appToken.User["Azure_user_ID"],
-			"roles":         appToken.User["roles"],
+			"user_id":    appToken.User.UserID,
+			"username":   appToken.User.Username,
+			"full_name":  appToken.User.FullName,
+			"department": appToken.User.Department,
+			"roles":      appToken.Roles,
 		},
-		"status": true,
 	})
 }

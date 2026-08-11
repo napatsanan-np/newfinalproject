@@ -27,6 +27,7 @@ const AuthCallback = () => {
           navigate("/Home")
         } else {
           alert("Login failed")
+          navigate("/")
         }
       })
   }, [location.search])
