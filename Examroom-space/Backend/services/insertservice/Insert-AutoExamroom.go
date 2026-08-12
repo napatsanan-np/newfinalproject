@@ -267,7 +267,7 @@ func (ea *ExamAllocator) InsertRoomWithRef(bestRoom models.Room, exam models.Roo
 	config, _ := ea.GetConfig()
 	tx, err := ea.db.Begin()
 	if err != nil {
-		fmt.Errorf("failed to start transaction: %w", err)
+		log.Printf("failed to start transaction: %v", err)
 	}
 	tx.Exec(
 		"UPDATE roomexam SET room_id = $1 WHERE ref = $2 and id_config = $3",
@@ -276,7 +276,7 @@ func (ea *ExamAllocator) InsertRoomWithRef(bestRoom models.Room, exam models.Roo
 		config[0].Id_config,
 	)
 	if err := tx.Commit(); err != nil {
-		fmt.Errorf("failed to commit transaction: %w", err)
+		log.Printf("failed to commit transaction: %v", err)
 	}
 	//ea.loadExams()
 	//fmt.Println(ea.Exams)
@@ -285,7 +285,7 @@ func (ea *ExamAllocator) InsertRoomWithRef(bestRoom models.Room, exam models.Roo
 func (ea *ExamAllocator) InsertRoomWithNo(tx *sql.Tx, examparm models.RoomExam, roomAllocation []RoomAllocation) error {
 	tx, err := ea.db.Begin()
 	if err != nil {
-		fmt.Errorf("failed to start transaction: %w", err)
+		log.Printf("failed to start transaction: %v", err)
 	}
 	// 3. ดึงข้อมูลการสอบ
 	exams, err := ea.getExamsByRef(examparm.Ref)
@@ -298,7 +298,7 @@ func (ea *ExamAllocator) InsertRoomWithNo(tx *sql.Tx, examparm models.RoomExam, 
 		return fmt.Errorf("error allocating rooms: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
-		fmt.Errorf("failed to commit transaction: %w", err)
+		log.Printf("failed to commit transaction: %v", err)
 	}
 	return nil
 }
@@ -381,7 +381,7 @@ func (ea *ExamAllocator) allocateRooms(tx *sql.Tx, exams []models.RoomExam, room
 		}
 
 		if !allocated {
-			return fmt.Errorf("no suitable room found for exam no %s with %d students", exam.No, numSt)
+			return fmt.Errorf("no suitable room found for exam no %d with %d students", exam.No, numSt)
 		}
 	}
 
@@ -463,13 +463,13 @@ func (i *UseInsertService) ClearDataroom() {
 	// Allocate room
 	tx, err := i.DB.Begin()
 	if err != nil {
-		fmt.Errorf("failed to start transaction: %w", err)
+		log.Printf("failed to start transaction: %v", err)
 	}
 	tx.Exec(
 		"UPDATE roomexam SET room_id = 'R011' WHERE room_id = '-';",
 	)
 	if err := tx.Commit(); err != nil {
-		fmt.Errorf("failed to commit transaction: %w", err)
+		log.Printf("failed to commit transaction: %v", err)
 	}
 }
 

@@ -12,6 +12,7 @@ import {
 } from "react-bootstrap";
 import axios from "axios";
 import SidebarMenu from "../../Navbar/SidebarMenu.jsx";
+import DownloadButton from "./DownloadButton.jsx";
 import "./NewForm-styles.css";
 import "./NewForm-fonts.css";
 
@@ -149,15 +150,19 @@ const ReceiveOnlineExam = () => {
                                     <td>{item.page || "-"}</td>
                                     <td>{item.exam_type || "-"}</td>
                                     <td>{item.submit || "-"}</td>
-                                    <td style={{ minWidth: "140px" }}>
-                                      <Button
-                                        variant="success"
-                                        size="sm"
-                                        disabled={isSubmitting}
-                                        onClick={() => handleReceiveExam(item)}
-                                      >
-                                        {isSubmitting ? "กำลังบันทึก..." : "รับข้อสอบ"}
-                                      </Button>
+                                    <td style={{ minWidth: "300px" }}>
+                                      <div className="d-flex">
+                                        <Button
+                                          variant="success"
+                                          size="sm"
+                                          className="me-2"
+                                          disabled={isSubmitting}
+                                          onClick={() => handleReceiveExam(item)}
+                                        >
+                                          {isSubmitting ? "กำลังบันทึก..." : "รับข้อสอบ"}
+                                        </Button>
+                                        <DownloadButton examRef={item.ref} size="sm" />
+                                      </div>
                                     </td>
                                   </tr>
                                 );

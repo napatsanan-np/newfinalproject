@@ -153,7 +153,7 @@ func (s *UseInsertService) insertprocessProtor(ref int, no int, proctor string) 
 
 		// Log if no matching user_id was found
 		if !found {
-			fmt.Printf("No matching user_id found for part '%s' in REF '%s'\n", part, ref)
+			fmt.Printf("No matching user_id found for part '%s' in REF '%d'\n", part, ref)
 		}
 
 		// Check for any errors during row iteration

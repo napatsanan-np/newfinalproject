@@ -177,7 +177,7 @@ func (db *UserDeleteService) DeleteUser(userID string) error {
 	}
 	if rowsAffected == 0 {
 		tx.Rollback()
-		return fmt.Errorf("user_id %d not found", userID)
+		return fmt.Errorf("user_id %s not found", userID)
 	}
 
 	// ยืนยันการลบ

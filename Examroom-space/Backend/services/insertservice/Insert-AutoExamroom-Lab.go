@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"math"
 	"strconv"
 	"strings"
@@ -220,7 +221,7 @@ func (ea *LabExamAllocator) InsertRoomWithRef(bestRoom models.Room, exam models.
 	config, _ := ea.GetConfig()
 	tx, err := ea.db.Begin()
 	if err != nil {
-		fmt.Errorf("failed to start transaction: %w", err)
+		log.Printf("failed to start transaction: %v", err)
 	}
 	tx.Exec(
 		"UPDATE roomexam SET room_id = $1 WHERE ref = $2 and id_config = $3",
@@ -229,7 +230,7 @@ func (ea *LabExamAllocator) InsertRoomWithRef(bestRoom models.Room, exam models.
 		config[0].Id_config,
 	)
 	if err := tx.Commit(); err != nil {
-		fmt.Errorf("failed to commit transaction: %w", err)
+		log.Printf("failed to commit transaction: %v", err)
 	}
 	//ea.loadExams()
 	//fmt.Println(ea.Exams)
@@ -238,7 +239,7 @@ func (ea *LabExamAllocator) InsertRoomWithRef(bestRoom models.Room, exam models.
 func (ea *LabExamAllocator) InsertRoomWithNo(tx *sql.Tx, examparm models.RoomExam, roomAllocation []RoomAllocation) error {
 	tx, err := ea.db.Begin()
 	if err != nil {
-		fmt.Errorf("failed to start transaction: %w", err)
+		log.Printf("failed to start transaction: %v", err)
 	}
 	// 3. ดึงข้อมูลการสอบ
 	exams, err := ea.getExamsByRef(examparm.Ref)
@@ -251,7 +252,7 @@ func (ea *LabExamAllocator) InsertRoomWithNo(tx *sql.Tx, examparm models.RoomExa
 		return fmt.Errorf("error allocating rooms: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
-		fmt.Errorf("failed to commit transaction: %w", err)
+		log.Printf("failed to commit transaction: %v", err)
 	}
 	return nil
 }
@@ -334,7 +335,7 @@ func (ea *LabExamAllocator) allocateRooms(tx *sql.Tx, exams []models.RoomExam, r
 		}
 
 		if !allocated {
-			return fmt.Errorf("no suitable room found for exam no %s with %d students", exam.No, numSt)
+			return fmt.Errorf("no suitable room found for exam no %d with %d students", exam.No, numSt)
 		}
 	}
 

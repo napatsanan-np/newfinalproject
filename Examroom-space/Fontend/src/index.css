@@ -2,7 +2,7 @@
 @font-face {
   font-family: Kanit;
   src: local("Kanit-Italic"),
-  url('./assets/Fonts/Kanit-Italic.yyf') format('truetype');
+  url('./assets/Fonts/Kanit-Italic.ttf') format('truetype');
 
 }
 

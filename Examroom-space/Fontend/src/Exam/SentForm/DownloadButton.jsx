@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from 'react-bootstrap';
 import JSZip from 'jszip';
 
-const DownloadButton = ({ examRef }) => {
+const DownloadButton = ({ examRef, size, className }) => {
   const [isDownloading, setIsDownloading] = useState(false);
   const url = localStorage.getItem("API") ;
   const token = localStorage.getItem('token');
@@ -102,15 +102,21 @@ const DownloadButton = ({ examRef }) => {
   return (
     <Button
       variant="success"
+      size={size}
+      className={className}
       onClick={handleDownload}
       disabled={isDownloading || !examRef}
-      style={{
-        width: '160px',
-        whiteSpace: 'nowrap',
-        overflow: 'hidden',
-        height: '45px',
-        marginRight: '10px'
-      }}
+      style={
+        size
+          ? undefined
+          : {
+              width: '160px',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              height: '45px',
+              marginRight: '10px'
+            }
+      }
     >
       {isDownloading ? 'กำลังดาวน์โหลด...' : 'ดาวน์โหลดไฟล์'}
     </Button>

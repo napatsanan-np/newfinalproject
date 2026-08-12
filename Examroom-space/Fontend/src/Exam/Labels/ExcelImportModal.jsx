@@ -765,7 +765,6 @@ export function ExcelImportModal({ show, handleClose, onImportSuccess, datas }) 
                       <td
                         style={{
                           border: "1px solid #ccc",
-                          fontSize: 16,
                           padding: "15px 5px",
                           whiteSpace: "nowrap",
                           fontSize: group.displayRow.includes("เสริม") ? 12 : 16
