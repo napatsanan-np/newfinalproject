@@ -8,15 +8,67 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
+
+	pdf "github.com/ledongthuc/pdf"
 
 	"github.com/gin-gonic/gin"
 	"github.com/models"
 )
+
+// pdfMagicNumber is the byte signature every valid PDF file starts with.
+var pdfMagicNumber = []byte("%PDF-")
+
+// validatePDFUpload rejects files that aren't really PDFs, even if named
+// "*.pdf" (e.g. a ZIP/DOCX renamed to .pdf), by checking both the extension
+// and the actual file signature instead of trusting the filename.
+func validatePDFUpload(fh *multipart.FileHeader) error {
+	if strings.ToLower(filepath.Ext(fh.Filename)) != ".pdf" {
+		return fmt.Errorf("%s: only .pdf files are allowed", fh.Filename)
+	}
+
+	f, err := fh.Open()
+	if err != nil {
+		return fmt.Errorf("%s: unable to read file", fh.Filename)
+	}
+	defer f.Close()
+
+	header := make([]byte, len(pdfMagicNumber))
+	if _, err := io.ReadFull(f, header); err != nil || !bytes.Equal(header, pdfMagicNumber) {
+		return fmt.Errorf("%s: file is not a valid PDF", fh.Filename)
+	}
+
+	return nil
+}
+
+// countPDFPages returns the real number of pages in the PDF file saved at
+// filePath, read straight from the file's page tree (not the filename or a
+// user-typed value), so it can be compared against what staff entered.
+func countPDFPages(filePath string) (int, error) {
+	f, r, err := pdf.Open(filePath)
+	if err != nil {
+		return 0, fmt.Errorf("%s: unable to read page count: %w", filepath.Base(filePath), err)
+	}
+	defer f.Close()
+
+	return r.NumPage(), nil
+}
+
+// removeFiles best-effort deletes files saved during a request that ends up
+// being rejected, so a failed submission doesn't leave orphaned files behind.
+func removeFiles(paths []string) {
+	for _, p := range paths {
+		if err := os.Remove(p); err != nil {
+			log.Println("cleanup: failed to remove file", p, err)
+		}
+	}
+}
 
 func (c *Controller) UpdateBackupExam(ctx *gin.Context) {
 
@@ -51,19 +103,56 @@ func (ctrl *Controller) UpdateDetailExam(c *gin.Context) {
 
 	files := c.Request.MultipartForm.File["fileexam[]"]
 
+	for _, file := range files {
+		if err := validatePDFUpload(file); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
+	pageCounts := map[string]int{}
+	var savedFilePaths []string
+
 	if len(files) > 0 {
 		for _, file := range files {
 
 			filePath := filepath.Join("./Exam-file", file.Filename)
 
 			if err := c.SaveUploadedFile(file, filePath); err != nil {
+				removeFiles(savedFilePaths)
 				c.JSON(http.StatusInternalServerError, gin.H{
 					"error": fmt.Sprintf("Failed to save file %s", file.Filename),
 				})
 				return
 			}
+			savedFilePaths = append(savedFilePaths, filePath)
 
 			formData.FileExam = append(formData.FileExam, filePath)
+
+			pages, err := countPDFPages(filePath)
+			if err != nil {
+				log.Println("countPDFPages error:", err)
+				removeFiles(savedFilePaths)
+				c.JSON(http.StatusBadRequest, gin.H{
+					"error": fmt.Sprintf("%s: ไม่สามารถตรวจสอบจำนวนหน้าของไฟล์ได้ กรุณาอัปโหลดไฟล์ใหม่", file.Filename),
+				})
+				return
+			}
+			pageCounts[file.Filename] = pages
+		}
+
+		if declaredPages, err := strconv.Atoi(strings.TrimSpace(formData.Page)); err == nil && declaredPages > 0 {
+			actualTotalPages := 0
+			for _, n := range pageCounts {
+				actualTotalPages += n
+			}
+			if actualTotalPages != declaredPages {
+				removeFiles(savedFilePaths)
+				c.JSON(http.StatusBadRequest, gin.H{
+					"error": "กรุณาตรวจสอบไฟล์ข้อสอบหรือแก้จำนวนหน้าให้ถูกต้องก่อนส่งข้อสอบ",
+				})
+				return
+			}
 		}
 	}
 
@@ -90,7 +179,8 @@ func (ctrl *Controller) UpdateDetailExam(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Data updated successfully",
+		"message":     "Data updated successfully",
+		"page_counts": pageCounts,
 	})
 }
 

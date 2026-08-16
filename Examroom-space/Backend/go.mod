@@ -7,6 +7,7 @@ require (
 	github.com/coreos/go-oidc v2.3.0+incompatible
 	github.com/gin-gonic/gin v1.10.0
 	github.com/golang-jwt/jwt/v5 v5.2.1
+	github.com/ledongthuc/pdf v0.0.0-20240314090751-a2a84ec735c3
 	golang.org/x/oauth2 v0.30.0
 )
 
