@@ -1,4 +1,4 @@
-docker compse down -v
+docker compose down -v
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Set-Location .\Backend

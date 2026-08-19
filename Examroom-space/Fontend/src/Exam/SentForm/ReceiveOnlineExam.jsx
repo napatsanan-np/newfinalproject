@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import useSWR from "swr";
 import {
   Container,
@@ -17,6 +18,7 @@ import "./NewForm-styles.css";
 import "./NewForm-fonts.css";
 
 const ReceiveOnlineExam = () => {
+  const navigate = useNavigate();
   const url = localStorage.getItem("API");
   const token = localStorage.getItem("token");
   const user = JSON.parse(localStorage.getItem("user") || "{}");
@@ -64,6 +66,7 @@ const ReceiveOnlineExam = () => {
 
       setMessage({ type: "success", text: "รับข้อสอบออนไลน์สำเร็จ" });
       await mutate();
+      navigate("/Pageform");
     } catch (err) {
       const errorMessage =
         err?.response?.data?.error ||

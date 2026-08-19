@@ -124,6 +124,7 @@ const SidebarMenu = () => {
       add("ส่งข้อสอบโดยเจ้าหน้าที่ห้องข้อสอบ", "/Pageform", <Send size={16} />);
       if (!hasRole("อาจารย์")) add("ดูรายละเอียดวิชา", "/PageSearch", <FileText size={16} />);
       add("สำรองข้อสอบ", "/Backup", <Copy size={16} />);
+      add("รับข้อสอบออนไลน์", "/ReceiveOnlineExam", <Send size={16} />);
     }
 
     return filtered;
