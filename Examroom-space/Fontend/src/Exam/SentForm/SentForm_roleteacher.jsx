@@ -12,6 +12,7 @@ import {
 } from "react-bootstrap";
 import Select from "react-select";
 import axios from "axios";
+import { PDFDocument } from "pdf-lib";
 import SidebarMenu from "../../Navbar/SidebarMenu.jsx";
 import "./NewForm-styles.css";
 import "./NewForm-fonts.css";
@@ -343,7 +344,28 @@ const Sentform_roleteacher = () => {
   };
 
 
-  const handleFileAdd = (e) => {
+  // อ่านจำนวนหน้าจริงจากไฟล์ PDF ในเบราว์เซอร์ (ฝั่ง client) เพื่อเติมช่อง "จำนวนหน้า" ให้อัตโนมัติ
+  const getPdfPageCount = async (file) => {
+    try {
+      const bytes = await file.arrayBuffer();
+      const doc = await PDFDocument.load(bytes, { ignoreEncryption: true });
+      return doc.getPageCount();
+    } catch (err) {
+      console.error("ไม่สามารถนับจำนวนหน้าไฟล์ได้:", file?.name, err);
+      return null;
+    }
+  };
+
+  // นับจำนวนหน้ารวมของไฟล์ทั้งหมดที่แนบอยู่ ถ้าไฟล์ใดนับไม่ได้จะคืนค่า null
+  // เพื่อไม่ให้เติมตัวเลขที่ไม่น่าเชื่อถือลงในฟอร์ม
+  const recalcPageCountFromFiles = async (files) => {
+    if (!files || files.length === 0) return 0;
+    const counts = await Promise.all(files.map(getPdfPageCount));
+    if (counts.some((c) => c === null)) return null;
+    return counts.reduce((sum, c) => sum + c, 0);
+  };
+
+  const handleFileAdd = async (e) => {
     const file = e.target.files[0];
     const maxFiles = parseInt(Data.copy) || 1;
 
@@ -354,29 +376,31 @@ const Sentform_roleteacher = () => {
     }
 
     if (file && file.type === "application/pdf") {
-      setData((prev) => ({
-        ...prev,
-        fileexam: [...(prev.fileexam || []), file],
-      }));
-      setSubmissionData((prev) => ({
-        ...prev,
-        fileexam: [...(prev.fileexam || []), file],
-      }));
+      const updatedFiles = [...(Data.fileexam || []), file];
+      setData((prev) => ({ ...prev, fileexam: updatedFiles }));
+      setSubmissionData((prev) => ({ ...prev, fileexam: updatedFiles }));
+
+      const totalPages = await recalcPageCountFromFiles(updatedFiles);
+      if (totalPages !== null) {
+        setData((prev) => ({ ...prev, page: String(totalPages) }));
+        setSubmissionData((prev) => ({ ...prev, page: String(totalPages) }));
+      }
     } else {
       alert("กรุณาเลือกไฟล์ PDF เท่านั้น");
     }
     e.target.value = "";
   };
 
-  const handleFileRemove = (indexToRemove) => {
-    setData((prev) => ({
-      ...prev,
-      fileexam: (prev.fileexam || []).filter((_, i) => i !== indexToRemove),
-    }));
-    setSubmissionData((prev) => ({
-      ...prev,
-      fileexam: (prev.fileexam || []).filter((_, i) => i !== indexToRemove),
-    }));
+  const handleFileRemove = async (indexToRemove) => {
+    const updatedFiles = (Data.fileexam || []).filter((_, i) => i !== indexToRemove);
+    setData((prev) => ({ ...prev, fileexam: updatedFiles }));
+    setSubmissionData((prev) => ({ ...prev, fileexam: updatedFiles }));
+
+    const totalPages = await recalcPageCountFromFiles(updatedFiles);
+    if (totalPages !== null) {
+      setData((prev) => ({ ...prev, page: String(totalPages) }));
+      setSubmissionData((prev) => ({ ...prev, page: String(totalPages) }));
+    }
   };
 
   const validateFiles = () => {
@@ -826,7 +850,9 @@ const handleSubmit = async (e) => {
                             >
                               <option value="1">1</option>
                               <option value="2">2</option>
+                              <option value="3">3</option>
                               <option value="4">4</option>
+                              <option value="5">5</option>
                             </BootstrapForm.Select>
                           </BootstrapForm.Group>
                         </Col>

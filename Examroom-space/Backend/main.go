@@ -88,7 +88,7 @@ func main() {
 			"X-Requested-With",
 			"X-CSRF-Token",
 		},
-		ExposeHeaders:    []string{"Content-Length"},
+		ExposeHeaders:    []string{"Content-Length", "Content-Disposition"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 		AllowWildcard:    false,

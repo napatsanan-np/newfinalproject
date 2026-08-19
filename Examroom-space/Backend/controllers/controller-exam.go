@@ -10,8 +10,10 @@ import (
 	"log"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -68,6 +70,23 @@ func removeFiles(paths []string) {
 			log.Println("cleanup: failed to remove file", p, err)
 		}
 	}
+}
+
+// contentDispositionHeader builds a Content-Disposition value that survives
+// non-ASCII (เช่น ชื่อวิชาภาษาไทย) filenames: an ASCII-safe fallback for old
+// clients (filename=) plus the real UTF-8 name per RFC 6266 (filename*=).
+func contentDispositionHeader(filename string) string {
+	return fmt.Sprintf(`attachment; filename="download%s"; filename*=UTF-8''%s`,
+		filepath.Ext(filename), url.PathEscape(filename))
+}
+
+// windowsIllegalFilenameChars matches characters Windows forbids in filenames
+// (< > : " / \ | ? * and control chars). Browsers auto-replace these with an
+// underscore on save, so we substitute a readable dash ourselves instead.
+var windowsIllegalFilenameChars = regexp.MustCompile(`[<>:"/\\|?*\x00-\x1F]`)
+
+func sanitizeFilename(name string) string {
+	return strings.TrimSpace(windowsIllegalFilenameChars.ReplaceAllString(name, "-"))
 }
 
 func (c *Controller) UpdateBackupExam(ctx *gin.Context) {
@@ -203,7 +222,7 @@ func (ctrl *Controller) GetFiles(c *gin.Context) {
 	}
 
 	log.Println("results", (*results)[0].Course)
-	filename := strconv.Itoa(refInt) + "--" + (*results)[0].Course + ".zip"
+	baseFilename := sanitizeFilename((*results)[0].Course)
 
 	files, err := ctrl.SelectService.GetFilesFromDB(refInt)
 	if err != nil {
@@ -217,17 +236,40 @@ func (ctrl *Controller) GetFiles(c *gin.Context) {
 		return
 	}
 
-	var buf bytes.Buffer
-	zipWriter := zip.NewWriter(&buf)
-
 	log.Println("filePath:::", files)
+
+	var existingFilePaths []string
 	for _, filePath := range files {
 		fullFilePath := filepath.Join("./", filePath)
 		if _, err := os.Stat(fullFilePath); os.IsNotExist(err) {
 			log.Println("File not found:", fullFilePath)
 			continue
 		}
+		existingFilePaths = append(existingFilePaths, fullFilePath)
+	}
 
+	if len(existingFilePaths) == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "No files found"})
+		return
+	}
+
+	// มีข้อสอบชุดเดียว: ส่งไฟล์ PDF ต้นฉบับตรงๆ ไม่ต้อง zip
+	if len(existingFilePaths) == 1 {
+		fileBytes, err := os.ReadFile(existingFilePaths[0])
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read file"})
+			return
+		}
+		c.Header("Content-Disposition", contentDispositionHeader(baseFilename+".pdf"))
+		c.Data(http.StatusOK, "application/pdf", fileBytes)
+		return
+	}
+
+	// มีตั้งแต่ 2 ชุดขึ้นไป: รวมเป็น zip เหมือนเดิม
+	var buf bytes.Buffer
+	zipWriter := zip.NewWriter(&buf)
+
+	for _, fullFilePath := range existingFilePaths {
 		file, err := os.Open(fullFilePath)
 		if err != nil {
 			log.Println("Error opening file:", fullFilePath, err)
@@ -235,7 +277,7 @@ func (ctrl *Controller) GetFiles(c *gin.Context) {
 		}
 		defer file.Close()
 
-		zipFileWriter, err := zipWriter.Create(filepath.Base(filePath))
+		zipFileWriter, err := zipWriter.Create(filepath.Base(fullFilePath))
 		if err != nil {
 			log.Println("Error creating zip entry:", err)
 			continue
@@ -254,7 +296,7 @@ func (ctrl *Controller) GetFiles(c *gin.Context) {
 		return
 	}
 
-	c.Header("Content-Disposition", "attachment; filename="+filename)
+	c.Header("Content-Disposition", contentDispositionHeader(baseFilename+".zip"))
 	c.Data(http.StatusOK, "application/zip", buf.Bytes())
 }
 

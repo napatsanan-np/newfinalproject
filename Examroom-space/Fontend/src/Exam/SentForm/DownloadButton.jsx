@@ -18,6 +18,24 @@ const DownloadButton = ({ examRef, size, className }) => {
     a.remove();
   };
 
+  // ดึงชื่อไฟล์จริง (รหัสวิชา--ชื่อวิชา) ที่ backend ตั้งไว้ใน Content-Disposition
+  // แทนการตั้งชื่อ exam_<ref> เอง — รองรับทั้งแบบมี filename* (UTF-8/ภาษาไทย) และ filename ธรรมดา
+  const parseFilenameFromContentDisposition = (headerValue) => {
+    if (!headerValue) return null;
+
+    const utf8Match = headerValue.match(/filename\*=UTF-8''([^;]+)/i);
+    if (utf8Match) {
+      try {
+        return decodeURIComponent(utf8Match[1]);
+      } catch {
+        // ถอดรหัสไม่ได้ ให้ลอง fallback ด้านล่างต่อ
+      }
+    }
+
+    const plainMatch = headerValue.match(/filename="?([^";]+)"?/i);
+    return plainMatch ? plainMatch[1] : null;
+  };
+
   const handleDirectDownload = async () => {
     const response = await fetch(`${url}/getfile/${examRef}`, {
       headers: {
@@ -29,8 +47,19 @@ const DownloadButton = ({ examRef, size, className }) => {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
+    // backend ส่งกลับเป็น .pdf ถ้ามีไฟล์เดียว หรือ .zip ถ้ามีตั้งแต่ 2 ไฟล์ขึ้นไป
+    const contentType = response.headers.get('Content-Type') || '';
+    const isSinglePdf = contentType.includes('application/pdf');
+    const fallbackFilename = isSinglePdf
+      ? `exam_${examRef}.pdf`
+      : `exam_files_${examRef}.zip`;
+
+    const filename =
+      parseFilenameFromContentDisposition(response.headers.get('Content-Disposition')) ||
+      fallbackFilename;
+
     const blob = await response.blob();
-    await downloadZipFile(blob, `exam_files_${examRef}.zip`);
+    await downloadZipFile(blob, filename);
   };
 
   const handleIndividualFilesDownload = async () => {
@@ -45,13 +74,13 @@ const DownloadButton = ({ examRef, size, className }) => {
     }
 
     const files = await filesResponse.json();
-    
+
     if (!files || files.length === 0) {
       throw new Error('ไม่พบไฟล์ที่ต้องการดาวน์โหลด');
     }
 
     const zip = new JSZip();
-    
+
     // ดาวน์โหลดแต่ละไฟล์และเพิ่มเข้า ZIP
     const downloadPromises = files.map(async (file, index) => {
       const fileResponse = await fetch(`${url}/getfile/${file.id}`, {
@@ -59,11 +88,11 @@ const DownloadButton = ({ examRef, size, className }) => {
           Authorization: `Bearer ${token}`,
         },
       });
-      
+
       if (!fileResponse.ok) {
         throw new Error(`ไม่สามารถดาวน์โหลดไฟล์ ${file.name || `exam_${index + 1}`} ได้`);
       }
-      
+
       const fileBlob = await fileResponse.blob();
       zip.file(file.name || `exam_${index + 1}.pdf`, fileBlob);
     });
@@ -75,10 +104,10 @@ const DownloadButton = ({ examRef, size, className }) => {
 
   const handleDownload = async () => {
     if (!examRef) return;
-    
+
     try {
       setIsDownloading(true);
-      
+
       // ลองดาวน์โหลดแบบที่ 1 ก่อน ถ้าไม่สำเร็จจะใช้แบบที่ 2
       try {
         await handleDirectDownload();
