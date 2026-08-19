@@ -31,15 +31,15 @@ import ReceiveOnlineExam from "./Exam/SentForm/ReceiveOnlineExam.jsx";
 const isAuthenticated = () => !!localStorage.getItem("token");
 
 
-localStorage.setItem('API', "http://localhost:8080/api")
-window.User = JSON.parse(localStorage.getItem('user'));
-console.log(localStorage.getItem('API'));
-
-
-
-/**localStorage.setItem('API', "https://exam.sc.su.ac.th/api")  
+/**localStorage.setItem('API', "http://localhost:8080/api")
 window.User = JSON.parse(localStorage.getItem('user'));
 console.log(localStorage.getItem('API'));**/
+
+
+
+localStorage.setItem('API', "https://exam.sc.su.ac.th/api")  
+window.User = JSON.parse(localStorage.getItem('user'));
+console.log(localStorage.getItem('API'));
 
 //console.log("User:: " ,window.User.full_name);
 //Backup
